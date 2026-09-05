@@ -1,0 +1,1 @@
+// 这是一个空的 Service Worker，用于让 Chrome 识别为 PWA

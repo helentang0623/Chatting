@@ -1087,6 +1087,15 @@
     background: #f0f0f0;
 }
     </style>
+
+    <script>
+        // 注册 Service Worker，使网站符合 PWA 标准，从而启用全屏
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/Chatting/sw.js')
+                .then(() => console.log('Service Worker 注册成功'))
+                .catch(err => console.log('Service Worker 注册失败:', err));
+        }
+    </script>
 </head>
 
 <body>
