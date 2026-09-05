@@ -1,0 +1,2876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AI Chat · 智能陪伴</title>
+
+    <!-- ===== 引入 Vue 3 ===== -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js">
+    </script>
+
+    <style>
+        /* ============================================================
+                   0. 全局重置 & 基础样式 (与之前保持一致)
+                   ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ece5dd;
+            color: #1a1a1a;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-height: 100vh;
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ============================================================
+                   导航栏 (与之前一致)
+                   ============================================================ */
+        .navbar {
+            flex-shrink: 0;
+            background: #075e54;
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+            z-index: 10;
+            position: relative;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-left .app-icon {
+            width: 32px;
+            height: 32px;
+            background: #25d366;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: #075e54;
+            flex-shrink: 0;
+        }
+
+        .navbar-left .app-title {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .navbar-right .status-badge {
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 10px;
+            border-radius: 30px;
+            white-space: nowrap;
+        }
+
+        .navbar-right .status-badge.online {
+            background: #25d366;
+            color: #075e54;
+        }
+
+        .navbar-right .status-badge.offline {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ccc;
+        }
+
+        .navbar-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+        }
+
+        .navbar-btn:active {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* ============================================================
+                   聊天区域 (与之前一致)
+                   ============================================================ */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 12px 14px 8px 14px;
+            background: #e5ddd5;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='%23c8c0b8' fill-opacity='0.4'/%3E%3C/svg%3E");
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            scroll-behavior: smooth;
+            
+            
+        }
+
+        .chat-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #8a7f77;
+            font-size: 15px;
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .chat-empty .empty-icon {
+            font-size: 52px;
+            margin-bottom: 16px;
+            opacity: 0.7;
+        }
+
+        .chat-empty .empty-sub {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 6px;
+        }
+
+        .chat-empty .btn-go-setting {
+            margin-top: 18px;
+            background: #075e54;
+            color: #fff;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 30px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .chat-empty .btn-go-setting:active {
+            background: #054b44;
+        }
+
+        /* 消息气泡 (与之前一致) */
+        .message-wrapper {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            max-width: 88%;
+            animation: msgIn 0.25s ease-out;
+        }
+
+        .message-wrapper.editing-wrapper {
+    width: 100%;
+    max-width: 100%;
+}
+
+        @keyframes msgIn {
+            0% {
+                opacity: 0;
+                transform: translateY(12px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .message-wrapper.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-wrapper.assistant {
+            align-self: flex-start;
+        }
+
+        .msg-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            color: #fff;
+            background: #9b9b9b;
+            margin-top: 2px;
+            user-select: none;
+        }
+
+        .message-wrapper.user .msg-avatar {
+            background: #075e54;
+        }
+
+        .message-wrapper.assistant .msg-avatar {
+            background: #5f7d9c;
+        }
+
+        .edit-container {
+    width: 100%;
+}
+.edit-textarea {
+    width: 100%;
+    padding: 8px;
+    border: 2px solid #075e54;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+    background: #fff;
+}
+.edit-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    justify-content: flex-end;
+}
+.edit-save-btn, .edit-cancel-btn {
+    padding: 4px 16px;
+    border: none;
+    border-radius: 16px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.edit-save-btn {
+    background: #075e54;
+    color: #fff;
+}
+.edit-cancel-btn {
+    background: #e0e0e0;
+    color: #333;
+}
+.edit-save-btn:active, .edit-cancel-btn:active {
+    opacity: 0.7;
+}
+
+        .bubble {
+            background: #ffffff;
+            padding: 8px 12px 6px 12px;
+            border-radius: 12px 12px 12px 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+            word-break: break-word;
+            line-height: 1.55;
+            font-size: 15px;
+            position: relative;
+            min-width: 40px;
+        }
+
+        .bubble.editing-bubble {
+            width: 100%;
+            min-width: 200px; /* 可选，确保足够的编辑空间 */
+            box-sizing: border-box;
+        }
+
+        .message-wrapper.user .bubble {
+            background: #dcf8c6;
+            border-radius: 12px 12px 4px 12px;
+        }
+
+        .bubble .msg-text {
+            white-space: pre-wrap;
+        }
+
+        .bubble .msg-time {
+            display: block;
+            text-align: right;
+            font-size: 11px;
+            color: #8a8a8a;
+            margin-top: 4px;
+            letter-spacing: 0.2px;
+            user-select: none;
+        }
+
+        .message-wrapper.user .bubble .msg-time {
+            color: #6b7a6b;
+        }
+
+        .message-wrapper.system {
+            align-self: center;
+            max-width: 92%;
+        }
+
+        .message-wrapper.system .bubble {
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 13px;
+            color: #555;
+            text-align: center;
+            box-shadow: none;
+        }
+
+        .typing-indicator {
+            align-self: flex-start;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0 2px 0;
+        }
+
+        .typing-indicator .bubble {
+            background: #fff;
+            border-radius: 16px 16px 16px 4px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #8a8a8a;
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingBounce {
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        .input-area {
+            flex-shrink: 0;
+            background: #f0eee9;
+            padding: 6px 10px 8px 10px;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            border-top: 1px solid #d1ccc7;
+            position: relative;
+        }
+
+        .input-area textarea {
+            flex: 1;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            background: #fff;
+            max-height: 100px;
+            min-height: 40px;
+            line-height: 1.4;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+            transition: box-shadow 0.2s;
+        }
+
+        .input-area textarea:focus {
+            box-shadow: inset 0 1px 4px rgba(7, 94, 84, 0.2);
+        }
+
+        .input-area textarea::placeholder {
+            color: #a8a8a8;
+            font-size: 14px;
+        }
+
+        .input-area .btn-send {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: #075e54;
+            color: #fff;
+            font-size: 22px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1px;
+        }
+
+        .input-area .btn-send:active {
+            transform: scale(0.92);
+            background: #054b44;
+        }
+
+        .input-area .btn-send:disabled {
+            opacity: 0.4;
+            transform: none;
+            pointer-events: none;
+        }
+
+        /* ============================================================
+                   设置页面通用样式
+                   ============================================================ */
+        .settings-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .settings-header {
+            flex-shrink: 0;
+            background: #075e54;
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+        }
+
+        .settings-header .back-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        .settings-header .back-btn:active {
+            opacity: 0.6;
+        }
+
+        .settings-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+            margin-left: 8px;
+        }
+
+        .settings-header .close-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        .settings-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 16px 80px 16px;
+            background: #f5f5f5;
+        }
+
+        /* 设置主页列表 */
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        }
+
+        .settings-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .settings-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-list-item:active {
+            background: #f0f0f0;
+        }
+
+        .settings-list-item .item-label {
+            font-size: 16px;
+            color: #1a1a1a;
+        }
+
+        .settings-list-item .item-arrow {
+            color: #c7c7c7;
+            font-size: 18px;
+        }
+
+        /* 子页面表单 */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .form-group label .label-hint {
+            font-weight: 400;
+            color: #999;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+
+        .form-group .input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .form-group .input-row input {
+            flex: 1;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            background: #fafafa;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #075e54;
+            box-shadow: 0 0 0 3px rgba(7, 94, 84, 0.1);
+            background: #fff;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+            line-height: 1.5;
+        }
+
+        .form-group .textarea-wrapper {
+            position: relative;
+        }
+
+        .form-group .textarea-wrapper .expand-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 18px;
+            cursor: pointer;
+            color: #888;
+            transition: background 0.2s;
+        }
+
+        .form-group .textarea-wrapper .expand-btn:active {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group .input-row .btn-fetch {
+            flex-shrink: 0;
+            padding: 10px 16px;
+            background: #e8f0ee;
+            border: 1.5px solid #d0dcd9;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #075e54;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .form-group .input-row .btn-fetch:active {
+            background: #d0e0dc;
+        }
+
+        .form-group .input-row .btn-fetch:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* 测试区域 */
+        .test-section {
+            background: #f5f8f7;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 6px 0 12px 0;
+        }
+
+        .test-section .test-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .test-section .btn-test {
+            padding: 8px 20px;
+            background: #075e54;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .test-section .btn-test:active {
+            background: #054b44;
+        }
+
+        .test-section .btn-test:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .test-section .test-result {
+            font-size: 14px;
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .test-section .test-result.success {
+            color: #0a7e5a;
+        }
+        .test-section .test-result.error {
+            color: #c0392b;
+        }
+        .test-section .test-result.idle {
+            color: #888;
+        }
+
+        .test-section .test-detail {
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+            word-break: break-all;
+            background: #fff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #e8e8e8;
+        }
+
+        /* 记忆管理特殊 */
+        .memory-status {
+            background: #f0f7f5;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #075e54;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .memory-status .count {
+            font-weight: 600;
+        }
+
+        .btn-summary {
+            width: 100%;
+            padding: 12px;
+            background: #075e54;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 6px;
+        }
+
+        .btn-summary:active {
+            background: #054b44;
+        }
+
+        .btn-summary:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* 底部固定按钮 */
+        .settings-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 12px 16px 16px 16px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+        }
+
+        .settings-footer .btn-save,
+        .settings-footer .btn-cancel {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .settings-footer .btn-save {
+            background: #075e54;
+            color: #fff;
+        }
+
+        .settings-footer .btn-save:active {
+            background: #054b44;
+        }
+
+        .settings-footer .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .settings-footer .btn-cancel:active {
+            background: #e0e0e0;
+        }
+
+        /* ============================================================
+                   全屏编辑器
+                   ============================================================ */
+        .fullscreen-editor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fullscreen-editor .editor-header {
+            flex-shrink: 0;
+            background: #075e54;
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+        }
+
+        .fullscreen-editor .editor-header .editor-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .fullscreen-editor .editor-header .editor-close {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        .fullscreen-editor .editor-body {
+            flex: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fullscreen-editor .editor-body textarea {
+            flex: 1;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            background: #fafafa;
+            transition: border-color 0.2s;
+        }
+
+        .fullscreen-editor .editor-body textarea:focus {
+            border-color: #075e54;
+            background: #fff;
+        }
+
+        .fullscreen-editor .editor-footer {
+            flex-shrink: 0;
+            padding: 12px 16px 16px 16px;
+            display: flex;
+            gap: 12px;
+            border-top: 1px solid #e0e0e0;
+            background: #fff;
+        }
+
+        .fullscreen-editor .editor-footer .btn-confirm,
+        .fullscreen-editor .editor-footer .btn-cancel-editor {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .fullscreen-editor .editor-footer .btn-confirm {
+            background: #075e54;
+            color: #fff;
+        }
+
+        .fullscreen-editor .editor-footer .btn-confirm:active {
+            background: #054b44;
+        }
+
+        .fullscreen-editor .editor-footer .btn-cancel-editor {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .fullscreen-editor .editor-footer .btn-cancel-editor:active {
+            background: #e0e0e0;
+        }
+
+        /* ============================================================
+                   工具类
+                   ============================================================ */
+        .text-muted {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .mt-1 {
+            margin-top: 4px;
+        }
+
+        /* 滚动条 */
+        .chat-area::-webkit-scrollbar,
+        .settings-body::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-area::-webkit-scrollbar-track,
+        .settings-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-area::-webkit-scrollbar-thumb,
+        .settings-body::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+        }
+
+        .time-label {
+            text-align: center;
+            font-size: 12px;
+            color: #292929;
+            background: rgba(0, 0, 0, 0.06); /* 半透明浅灰，类似微信 */
+            padding: 6px 12px;
+            border-radius: 30px;
+            margin: 10px auto;
+            display: inline-block;
+            max-width: 80%;
+            align-self: center;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); /* 轻微阴影 */
+        }
+
+        /* 适配 */
+        @media (max-width: 480px) {
+            .navbar {
+                padding: 10px 14px;
+                min-height: 50px;
+            }
+            .navbar-left .app-title {
+                font-size: 16px;
+            }
+            .chat-area {
+                padding: 10px 10px 6px 10px;
+            }
+            .bubble {
+                font-size: 14px;
+                padding: 7px 11px 5px 11px;
+            }
+            .msg-avatar {
+                width: 30px;
+                height: 30px;
+                font-size: 12px;
+            }
+            .message-wrapper {
+                max-width: 92%;
+            }
+            .settings-body {
+                padding: 12px 12px 80px 12px;
+            }
+            .input-area textarea {
+                font-size: 14px;
+                padding: 8px 14px;
+                min-height: 36px;
+            }
+            .input-area .btn-send {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .navbar-left .app-title {
+                font-size: 14px;
+            }
+            .navbar-right .status-badge {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+            .bubble {
+                font-size: 13px;
+                padding: 6px 10px 4px 10px;
+            }
+            .msg-avatar {
+                width: 26px;
+                height: 26px;
+                font-size: 11px;
+            }
+            .settings-body {
+                padding: 10px 10px 80px 10px;
+            }
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+        }
+
+        @supports (padding: max(0px)) {
+            .navbar {
+                padding-top: max(12px, env(safe-area-inset-top));
+                padding-left: max(16px, env(safe-area-inset-left));
+                padding-right: max(16px, env(safe-area-inset-right));
+            }
+            .input-area {
+                padding-bottom: max(8px, env(safe-area-inset-bottom));
+            }
+            .settings-footer {
+                padding-bottom: max(16px, env(safe-area-inset-bottom));
+            }
+            .fullscreen-editor .editor-footer {
+                padding-bottom: max(16px, env(safe-area-inset-bottom));
+            }
+        }
+        /* 消息操作菜单 */
+.message-menu {
+    position: fixed;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 8px 0;
+    min-width: 150px;
+    z-index: 300;
+    transform: none;  /* 去掉之前的变换 */
+    margin: 0;
+}
+.message-menu .menu-item {
+    padding: 10px 20px;
+    font-size: 15px;
+    color: #1a1a1a;
+    cursor: pointer;
+    transition: background 0.1s;
+    white-space: nowrap;
+}
+.message-menu .menu-item:active {
+    background: #f0f0f0;
+}
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+
+        <!-- ===== 顶部导航 (始终显示) ===== -->
+        <header class="navbar">
+            <div class="navbar-left">
+                <span class="app-icon" style="background:transparent; width:auto; height:auto; padding:0;">
+    <img v-if="config.roleAvatar" :src="config.roleAvatar" style="width:32px; height:32px; border-radius:50%; object-fit:cover; display:block;" />
+    <span v-else style="font-size:28px; line-height:1;">🤖</span>
+</span>
+<span class="app-title">{{ config.roleDisplayName || 'AI Chat' }}</span>
+            </div>
+            <div class="navbar-right">
+                <!-- <span class="status-badge" :class="apiConfigured ? 'online' : 'offline'">
+                    {{ apiConfigured ? '已连接' : '未配置' }}
+                </span> -->
+                <button class="navbar-btn" @click="openSettings" title="设置" aria-label="设置">
+                    ⚙️
+                </button>
+                
+            </div>
+        </header>
+
+        <!-- ===== 聊天区域 ===== -->
+        <div class="chat-area" ref="chatContainer" @scroll="onChatScroll">
+            <template v-for="item in displayMessages" :key="item.id || item.timestamp">
+    <!-- 时间标签 -->
+    <div v-if="item.type === 'time-label'" class="time-label">
+        {{ item.displayTime }}
+    </div>
+    <!-- 普通消息 -->
+    <div v-else-if="item.role === 'user' || item.role === 'assistant'" 
+         class="message-wrapper" 
+         :class="[item.role, { 'editing-wrapper': editingMessageId === item.id }]"
+         @mousedown="editingMessageId !== item.id ? startLongPress($event, item) : null"
+         @contextmenu="openMessageMenu($event, item)"
+         @touchstart="editingMessageId !== item.id ? startLongPress($event, item) : null"
+         @touchend="cancelLongPress"
+         @touchmove="cancelLongPress">
+        <div class="msg-avatar" :style="item.role === 'user' ? (config.userAvatar ? '' : 'background:#075e54') : (config.roleAvatar ? '' : 'background:#5f7d9c')">
+            <img v-if="item.role === 'user' && config.userAvatar" :src="config.userAvatar" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+            <img v-else-if="item.role === 'assistant' && config.roleAvatar" :src="config.roleAvatar" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+            <span v-else>{{ item.role === 'user' ? '我' : 'AI' }}</span>
+        </div>
+        <div class="bubble" :class="{ 'editing-bubble': editingMessageId === item.id }">
+            <div v-if="editingMessageId === item.id" class="edit-container">
+                <textarea v-model="editingContent" class="edit-textarea" rows="3"></textarea>
+                <div class="edit-actions">
+                    <button @click="saveEdit(item)" class="edit-save-btn">✅ 保存</button>
+                    <button @click="cancelEdit" class="edit-cancel-btn">❌ 取消</button>
+                </div>
+            </div>
+            <div v-else>
+                <div class="msg-text">{{ item.content }}</div>
+                <!-- <span class="msg-time">{{ item.time }}</span> -->
+            </div>
+        </div>
+    </div>
+    <!-- 系统消息 -->
+    <div v-else-if="item.role === 'system'" class="message-wrapper system">
+        <div class="bubble">
+            <span class="msg-text">{{ item.content }}</span>
+        </div>
+    </div>
+</template>
+
+            <div v-if="isTyping" class="typing-indicator">
+    <div class="msg-avatar" :style="config.roleAvatar ? '' : 'background:#5f7d9c'">
+        <img v-if="config.roleAvatar" :src="config.roleAvatar" style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+        <span v-else>AI</span>
+    </div>
+    <div class="bubble">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+    </div>
+</div>
+
+            <div v-if="messages.length === 0 && !isTyping" class="chat-empty">
+                <div class="empty-icon">💬</div>
+                <div style="font-weight:500; font-size:17px;">开始你的AI陪伴之旅</div>
+                <div class="empty-sub">配置好 API 后，就可以和 AI 聊天了</div>
+                <button class="btn-go-setting" @click="openSettings">⚙️ 去设置</button>
+            </div>
+            <div style="height:4px;"></div>
+            <!-- 消息操作菜单 -->
+            <div v-if="showMessageMenu" 
+                class="message-menu" 
+                :style="{ left: menuPosition.x + 'px', top: menuPosition.y + 'px' }"
+                @click.stop>
+                <div class="menu-item" v-if="targetMessage && targetMessage.role === 'assistant' && isLatestAI(targetMessage)" @click="reReply">🔄 重新回复</div>
+                <div class="menu-item" v-if="targetMessage && targetMessage.role === 'assistant' && isLatestAI(targetMessage)" @click="editReply">✏️ 编辑回复</div>
+                <div class="menu-item" @click="deleteMessage">🗑️ 删除</div>
+            </div>
+        </div>
+
+        <!-- ===== 底部输入栏 ===== -->
+        <div class="input-area">
+            <textarea v-model="inputMessage" @keydown.enter.prevent="sendMessage" @input="autoResizeTextarea"
+            placeholder="输入消息..." rows="1" ref="inputTextarea" :disabled="isSending || !apiConfigured">
+        </textarea>
+        <button class="btn-send" @click="sendMessage" :disabled="isSending || !inputMessage.trim() || !apiConfigured">
+            <span v-if="!isSending">➤</span>
+            <span v-else style="font-size:16px;">⏳</span>
+        </button>
+    </div>
+
+    <!-- ============================================================
+    设置系统 (多层视图)
+    ============================================================ -->
+    <div v-if="showSettings" class="settings-overlay">
+
+        <!-- ===== 设置主页 ===== -->
+        <template v-if="settingsView === 'home'">
+    <div class="settings-header">
+        <button class="back-btn" @click="closeSettings">‹</button>
+        <h2>设置</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="settings-list">
+            <div class="settings-list-item" @click="settingsView = 'api'">
+                <span class="item-label">🔌 API接入</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="settingsView = 'personaMenu'">
+                <span class="item-label">🎭 人物设定</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="settingsView = 'memory'">
+                <span class="item-label">🧠 记忆管理</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="settingsView = 'behavior'">
+                <span class="item-label">🤖 AI行为设置</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="clearChat">
+                <span class="item-label">🗑️ 清空聊天</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="exportData">
+                <span class="item-label">📤 导出数据</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="importData">
+                <span class="item-label">📥 导入数据</span>
+                <span class="item-arrow">›</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+        <!-- ===== API接入子页 ===== -->
+        <template v-if="settingsView === 'api'">
+            <div class="settings-header">
+                <button class="back-btn" @click="settingsView = 'home'">‹</button>
+                <h2>API接入</h2>
+                <span style="width:40px;"></span>
+            </div>
+            <div class="settings-body">
+                <div class="form-group">
+                    <label>API 地址 <span class="label-hint">(如: https://api.openai.com/v1)</span></label>
+                    <input type="url" v-model="tempConfig.apiUrl" placeholder="https://api.openai.com/v1" />
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" v-model="tempConfig.apiKey" placeholder="sk-..." />
+                </div>
+                <div class="form-group">
+                    <label>模型</label>
+                    <div class="input-row">
+                        <input type="text" v-model="tempConfig.model" placeholder="gpt-3.5-turbo" list="modelList" />
+                        <datalist id="modelList">
+                            <option v-for="m in modelOptions" :key="m" :value="m" />
+                        </datalist>
+                        <button class="btn-fetch" @click="fetchModels" :disabled="isFetchingModels">
+                            {{ isFetchingModels ? '⏳' : '🔄' }}
+                        </button>
+                    </div>
+                    <div v-if="modelOptions.length > 0" class="text-muted" style="margin-top:4px; font-size:12px;">
+                        已获取 {{ modelOptions.length }} 个模型
+                    </div>
+                </div>
+                <div class="test-section">
+                    <div class="test-row">
+                        <button class="btn-test" @click="runTest" :disabled="isTesting || !tempConfig.apiUrl || !tempConfig.apiKey">
+                            🧪 {{ isTesting ? '测试中...' : '测试连接' }}
+                        </button>
+                        <div class="test-result" :class="testStatus">
+                            <span v-if="testStatus === 'idle'">⏳ 等待测试</span>
+                            <span v-else-if="testStatus === 'testing'">⏳ 测试中...</span>
+                            <span v-else-if="testStatus === 'success'">✅ 成功</span>
+                            <span v-else-if="testStatus === 'error'">❌ 失败</span>
+                        </div>
+                    </div>
+                    <div v-if="testDetail" class="test-detail">{{ testDetail }}</div>
+                </div>
+            </div>
+            <div class="settings-footer">
+                <button class="btn-cancel" @click="cancelApi">取消</button>
+                <button class="btn-save" @click="saveApi">保存</button>
+            </div>
+        </template>
+
+        <!-- ===== 人物设定菜单 ===== -->
+<template v-if="settingsView === 'personaMenu'">
+    <div class="settings-header">
+        <button class="back-btn" @click="settingsView = 'home'">‹</button>
+        <h2>人物设定</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="settings-list">
+            <div class="settings-list-item" @click="settingsView = 'personaRole'">
+                <span class="item-label">🎭 角色设定 (AI)</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="settingsView = 'personaUser'">
+                <span class="item-label">👤 用户设定</span>
+                <span class="item-arrow">›</span>
+            </div>
+            <div class="settings-list-item" @click="settingsView = 'personaWorld'">
+                <span class="item-label">🌍 世界设定</span>
+                <span class="item-arrow">›</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- ===== 角色设定子页 ===== -->
+<template v-if="settingsView === 'personaRole'">
+    <div class="settings-header">
+        <button class="back-btn" @click="settingsView = 'personaMenu'">‹</button>
+        <h2>角色设定 (AI)</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" v-model="tempConfig.roleName" placeholder="例：艾丽丝" />
+        </div>
+        <div class="form-group">
+    <label>头像</label>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <img v-if="tempConfig.roleAvatar" :src="tempConfig.roleAvatar" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:1px solid #ddd;" />
+        <div v-else style="width:60px; height:60px; border-radius:50%; background:#e0e0e0; display:flex; align-items:center; justify-content:center; font-size:24px; color:#aaa;">📷</div>
+        <input type="file" accept="image/*" @change="uploadAvatar" style="flex:1; min-width:120px;" />
+        <button v-if="tempConfig.roleAvatar" @click="removeAvatar" style="background:none; border:none; color:#c0392b; font-size:20px; padding:0 8px;">✕</button>
+    </div>
+</div>
+        <div class="form-group">
+            <label>基本信息</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.roleBasic" rows="2" placeholder="年龄、生日、外貌、职业等"></textarea>
+                <button class="expand-btn" @click="openFullscreen('roleBasic')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>性格</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.rolePersonality" rows="2" placeholder="例：温柔善良，但偶尔固执"></textarea>
+                <button class="expand-btn" @click="openFullscreen('rolePersonality')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>故事背景</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.roleBackground" rows="3" placeholder="角色的过去、经历等"></textarea>
+                <button class="expand-btn" @click="openFullscreen('roleBackground')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>说话风格</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.roleStyle" rows="2" placeholder="例：喜欢用短句，偶尔夹杂英文"></textarea>
+                <button class="expand-btn" @click="openFullscreen('roleStyle')">⤢</button>
+            </div>
+        </div>
+    </div>
+    <div class="settings-footer">
+        <button class="btn-cancel" @click="cancelPersona">取消</button>
+        <button class="btn-save" @click="savePersona">保存</button>
+    </div>
+</template>
+
+<!-- ===== 用户设定子页 ===== -->
+<template v-if="settingsView === 'personaUser'">
+    <div class="settings-header">
+        <button class="back-btn" @click="settingsView = 'personaMenu'">‹</button>
+        <h2>用户设定</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" v-model="tempConfig.userName" placeholder="例：小明" />
+        </div>
+        <div class="form-group">
+    <label>用户头像</label>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <img v-if="tempConfig.userAvatar" :src="tempConfig.userAvatar" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:1px solid #ddd;" />
+        <div v-else style="width:60px; height:60px; border-radius:50%; background:#e0e0e0; display:flex; align-items:center; justify-content:center; font-size:24px; color:#aaa;">👤</div>
+        <input type="file" accept="image/*" @change="uploadUserAvatar" style="flex:1; min-width:120px;" />
+        <button v-if="tempConfig.userAvatar" @click="removeUserAvatar" style="background:none; border:none; color:#c0392b; font-size:20px; padding:0 8px;">✕</button>
+    </div>
+</div>
+        <div class="form-group">
+            <label>基本信息</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.userBasic" rows="2" placeholder="年龄、生日、外貌、职业等"></textarea>
+                <button class="expand-btn" @click="openFullscreen('userBasic')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>性格</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.userPersonality" rows="2" placeholder="例：乐观开朗，但有点冒失"></textarea>
+                <button class="expand-btn" @click="openFullscreen('userPersonality')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>故事背景</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.userBackground" rows="3" placeholder="用户的背景故事"></textarea>
+                <button class="expand-btn" @click="openFullscreen('userBackground')">⤢</button>
+            </div>
+        </div>
+    </div>
+    <div class="settings-footer">
+        <button class="btn-cancel" @click="cancelPersona">取消</button>
+        <button class="btn-save" @click="savePersona">保存</button>
+    </div>
+</template>
+
+<!-- ===== 世界设定子页 ===== -->
+<template v-if="settingsView === 'personaWorld'">
+    <div class="settings-header">
+        <button class="back-btn" @click="settingsView = 'personaMenu'">‹</button>
+        <h2>世界设定</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="form-group">
+            <label>世界观</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.personaWorld" rows="6" placeholder="整个故事的世界观、背景、规则等"></textarea>
+                <button class="expand-btn" @click="openFullscreen('personaWorld')">⤢</button>
+            </div>
+        </div>
+    </div>
+    <div class="settings-footer">
+        <button class="btn-cancel" @click="cancelPersona">取消</button>
+        <button class="btn-save" @click="savePersona">保存</button>
+    </div>
+</template>
+
+        <!-- ===== 记忆管理子页 ===== -->
+        <template v-if="settingsView === 'memory'">
+            <div class="settings-header">
+                <button class="back-btn" @click="settingsView = 'home'">‹</button>
+                <h2>记忆管理</h2>
+                <span style="width:40px;"></span>
+            </div>
+            <div class="settings-body">
+                <div class="memory-status">
+                    <span>当前对话轮次</span>
+                    <span class="count">{{ conversationRounds }}</span>
+                </div>
+                <div class="form-group">
+                    <label>记忆摘要 <span class="label-hint">(可手动编辑)</span></label>
+                    <div class="textarea-wrapper">
+                        <textarea v-model="tempConfig.memorySummary" rows="5" placeholder="暂无记忆摘要，点击下方按钮生成。"></textarea>
+                        <button class="expand-btn" @click="openFullscreen('memorySummary')">⤢</button>
+                    </div>
+                </div>
+                <button class="btn-summary" @click="generateSummary" :disabled="isSummarizing || !apiConfigured">
+                    {{ isSummarizing ? '⏳ 总结中...' : '📝 立即总结当前记忆' }}
+                </button>
+                <div v-if="summaryStatus" class="test-detail" style="margin-top:10px;">{{ summaryStatus }}</div>
+            </div>
+            <div class="settings-footer">
+                <button class="btn-cancel" @click="cancelMemory">取消</button>
+                <button class="btn-save" @click="saveMemory">保存</button>
+            </div>
+        </template>
+
+        <!-- ===== AI行为设置子页 ===== -->
+<template v-if="settingsView === 'behavior'">
+    <div class="settings-header">
+        <button class="back-btn" @click="settingsView = 'home'">‹</button>
+        <h2>AI行为设置</h2>
+        <span style="width:40px;"></span>
+    </div>
+    <div class="settings-body">
+        <div class="form-group">
+            <label>回复规则</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.replyRules" rows="4" placeholder="例：如果你需要分多条回复，请务必在每条回复之间插入 [SPLIT]..."></textarea>
+                <button class="expand-btn" @click="openFullscreen('replyRules')">⤢</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>全局注意事项</label>
+            <div class="textarea-wrapper">
+                <textarea v-model="tempConfig.globalNotes" rows="4" placeholder="例：必须用英文回复。记住角色关系..."></textarea>
+                <button class="expand-btn" @click="openFullscreen('globalNotes')">⤢</button>
+            </div>
+        </div>
+    </div>
+    <div class="settings-footer">
+        <button class="btn-cancel" @click="settingsView = 'home'">取消</button>
+        <button class="btn-save" @click="saveBehavior">保存</button>
+    </div>
+</template>
+
+        <!-- ===== 全屏编辑器 ===== -->
+        <div v-if="fullscreenVisible" class="fullscreen-editor">
+            <div class="editor-header">
+                <span class="editor-title">{{ fullscreenTitle }}</span>
+                <button class="editor-close" @click="closeFullscreen">✕</button>
+            </div>
+            <div class="editor-body">
+                <textarea v-model="fullscreenContent" @input="onFullscreenInput"></textarea>
+            </div>
+            <div class="editor-footer">
+                <button class="btn-cancel-editor" @click="closeFullscreen">取消</button>
+                <button class="btn-confirm" @click="confirmFullscreen">确认</button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ============================================================
+Vue 3 应用
+============================================================ -->
+<script>
+    const { createApp, ref, reactive, computed, watch, nextTick, onMounted } = Vue;
+
+    const app = createApp({
+        setup() {
+            // ============================================================
+            // 1. 状态
+            // ============================================================
+
+            // ---- 主配置 (持久化) ----
+            const config = reactive({
+                apiUrl: '',
+                apiKey: '',
+                model: '',
+                personaAI: '',
+                personaUser: '',
+                personaWorld: '',
+                personaStyle: '',
+                memorySummary: '',
+                roleDisplayName: '',
+                roleAvatar: '',
+                userAvatar: '',
+                replyRules: '',
+                globalNotes: '',
+                userCity: '',
+            });
+
+            // ---- 临时配置 (编辑用) ----
+            const tempConfig = reactive({
+                apiUrl: '',
+                apiKey: '',
+                model: '',
+                personaAI: '',
+                personaUser: '',
+                personaWorld: '',
+                personaStyle: '',
+                memorySummary: '',
+                // 角色设定拆分
+                roleName: '',
+                roleDisplayName: '',
+                roleAvatar: '',
+                roleBasic: '',
+                rolePersonality: '',
+                roleBackground: '',
+                roleStyle: '',
+                // 用户设定拆分
+                userName: '',
+                userBasic: '',
+                userPersonality: '',
+                userBackground: '',
+                userAvatar: '',
+                replyRules: '',
+                globalNotes: '',
+                userCity: '',
+            });
+
+            // ---- 长按/右键菜单 ----
+            const showMessageMenu = ref(false);
+            const menuPosition = ref({ x: 0, y: 0 });
+            const targetMessage = ref(null);        // 当前操作的消息对象
+            const menuType = ref('');              // 区分是AI还是用户消息（我们只给AI用，但可扩展）
+
+            const editingMessageId = ref(null);  // 当前正在编辑的消息ID
+            const editingContent = ref('');      // 编辑中的临时内容
+
+            // ---- 聊天 ----
+            const messages = ref([]);
+            const inputMessage = ref('');
+            const isSending = ref(false);
+            const isTyping = ref(false);
+            let msgIdCounter = 0;
+            // ---- 连发缓冲 ----
+            const messageBuffer = ref([]);        // 暂存用户连续发送的消息
+            let sendTimer = null;                 // 5秒倒计时定时器
+            const SEND_DELAY = 5000;              // 5秒（单位毫秒）
+
+            // ---- 模型列表 ----
+            const modelOptions = ref([]);
+            const isFetchingModels = ref(false);
+
+            // ---- 测试 ----
+            const testStatus = ref('idle');
+            const testDetail = ref('');
+            const isTesting = ref(false);
+
+            // ---- 设置视图 ----
+            const showSettings = ref(false);
+            const settingsView = ref('home'); // 'home' | 'api' | 'persona' | 'memory'
+
+            // ---- 全屏编辑器 ----
+            const fullscreenVisible = ref(false);
+            const fullscreenField = ref('');
+            const fullscreenContent = ref('');
+            const fullscreenTitle = ref('');
+
+            // ---- 记忆总结 ----
+            const isSummarizing = ref(false);
+            const summaryStatus = ref('');
+
+            // ---- DOM refs ----
+            const chatContainer = ref(null);
+            const inputTextarea = ref(null);
+
+            // ============================================================
+            // 2. 计算属性
+            // ============================================================
+
+            const apiConfigured = computed(() => {
+                return !!config.apiUrl && !!config.apiKey && !!config.model;
+            });
+
+            const conversationRounds = computed(() => {
+                return messages.value.filter(m => m.role === 'user' || m.role === 'assistant').length;
+            });
+
+            const displayMessages = computed(() => {
+    const result = [];
+    const fiveMinutes = 5 * 60 * 1000; // 5 分钟
+    const msgs = messages.value;
+
+    // 如果消息列表不为空，在第一条消息前插入时间标签
+    if (msgs.length > 0) {
+        result.push({
+            type: 'time-label',
+            timestamp: msgs[0].timestamp,
+            displayTime: formatTimeLabel(msgs[0].timestamp),
+        });
+    }
+
+    for (let i = 0; i < msgs.length; i++) {
+        const current = msgs[i];
+        // 检查当前消息与上一条消息的间隔
+        if (i > 0) {
+            const prev = msgs[i - 1];
+            if (current.timestamp && prev.timestamp) {
+                const diff = current.timestamp - prev.timestamp;
+                if (diff > fiveMinutes) {
+                    result.push({
+                        type: 'time-label',
+                        timestamp: current.timestamp,
+                        displayTime: formatTimeLabel(current.timestamp),
+                    });
+                }
+            }
+        }
+        // 加入当前消息
+        result.push(current);
+    }
+    return result;
+});
+
+            // ============================================================
+            // 3. 核心方法
+            // ============================================================
+
+            function getTimeStr() {
+                const d = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+
+           function formatTimeLabel(timestamp) {
+    const date = new Date(timestamp);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    const day = date.getDate();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${month} ${day} ${hours}:${minutes}`;
+}
+
+            function addMessage(role, content, isSystem = false) {
+                const now = Date.now();
+const msg = {
+    id: ++msgIdCounter,
+    role: role,
+    content: content,
+    time: getTimeStr(),
+    timestamp: now,   // 新增：完整时间戳（毫秒）
+};
+                messages.value.push(msg);
+                scrollToBottom();
+                saveChatToLocal();
+                return msg;
+            }
+
+            function scrollToBottom() {
+                nextTick(() => {
+                    const el = chatContainer.value;
+                    if (el) el.scrollTop = el.scrollHeight;
+                });
+            }
+
+            function autoResizeTextarea() {
+                nextTick(() => {
+                    const el = inputTextarea.value;
+                    if (el) {
+                        el.style.height = 'auto';
+                        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+                    }
+                });
+            }
+
+            function onChatScroll() { /* 可留空 */ }
+
+            // 长按定时器
+let longPressTimer = null;
+let ignoreNextClick = false;
+
+function startLongPress(event, msg) {
+    // 清除之前的定时器（防止重复）
+    if (longPressTimer) clearTimeout(longPressTimer);
+    // 设置新定时器，延迟 600ms 后打开菜单
+    longPressTimer = setTimeout(() => {
+        openMessageMenu(event, msg);
+    }, 600);
+}
+
+function cancelLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+}
+
+            function saveEdit(msg) {
+    msg.content = editingContent.value.trim() || msg.content; // 如果为空则保留原内容
+    editingMessageId.value = null;
+    editingContent.value = '';
+    saveChatToLocal(); // 保存到本地
+}
+
+function cancelEdit() {
+    editingMessageId.value = null;
+    editingContent.value = '';
+}
+
+function isLatestAI(msg) {
+    if (!msg || msg.role !== 'assistant') return false;
+    const aiMessages = messages.value.filter(m => m.role === 'assistant');
+    if (aiMessages.length === 0) return false;
+    return msg.id === aiMessages[aiMessages.length - 1].id;
+}
+
+            // ============================================================
+            // 4. 设置导航
+            // ============================================================
+
+            function openSettings() {
+                // 复制当前配置到临时
+                Object.assign(tempConfig, config);
+                parsePersonaFields();
+                // 重置测试状态
+                testStatus.value = 'idle';
+                testDetail.value = '';
+                summaryStatus.value = '';
+                settingsView.value = 'home';
+                showSettings.value = true;
+                // 加载模型列表如果有
+                if (!tempConfig.apiUrl || !tempConfig.apiKey) {
+                    modelOptions.value = [];
+                }
+            }
+
+
+function parsePersonaFields() {
+    // 解析角色设定 (5个标记)
+    const roleStr = config.personaAI || '';
+    const roleParts = { name: '', basic: '', personality: '', background: '', style: '' };
+    const markers = ['[NAME]', '[BASIC]', '[PERSONALITY]', '[BACKGROUND]', '[STYLE]'];
+    let remaining = roleStr;
+    markers.forEach((marker, idx) => {
+        const nextMarker = markers[idx + 1] || null;
+        const start = remaining.indexOf(marker);
+        if (start !== -1) {
+            const end = nextMarker ? remaining.indexOf(nextMarker, start + marker.length) : remaining.length;
+            if (end !== -1) {
+                const value = remaining.substring(start + marker.length, end).trim();
+                switch (marker) {
+                    case '[NAME]': roleParts.name = value; break;
+                    case '[BASIC]': roleParts.basic = value; break;
+                    case '[PERSONALITY]': roleParts.personality = value; break;
+                    case '[BACKGROUND]': roleParts.background = value; break;
+                    case '[STYLE]': roleParts.style = value; break;
+                }
+                if (nextMarker) remaining = remaining.substring(end);
+            }
+        }
+    });
+    tempConfig.roleName = roleParts.name;
+    tempConfig.roleBasic = roleParts.basic;
+    tempConfig.rolePersonality = roleParts.personality;
+    tempConfig.roleBackground = roleParts.background;
+    tempConfig.roleStyle = roleParts.style;
+
+    // 解析用户设定 (4个标记)
+    const userStr = config.personaUser || '';
+    const userParts = { name: '', basic: '', personality: '', background: '' };
+    const userMarkers = ['[NAME]', '[BASIC]', '[PERSONALITY]', '[BACKGROUND]'];
+    let userRemaining = userStr;
+    userMarkers.forEach((marker, idx) => {
+        const nextMarker = userMarkers[idx + 1] || null;
+        const start = userRemaining.indexOf(marker);
+        if (start !== -1) {
+            const end = nextMarker ? userRemaining.indexOf(nextMarker, start + marker.length) : userRemaining.length;
+            if (end !== -1) {
+                const value = userRemaining.substring(start + marker.length, end).trim();
+                switch (marker) {
+                    case '[NAME]': userParts.name = value; break;
+                    case '[BASIC]': userParts.basic = value; break;
+                    case '[PERSONALITY]': userParts.personality = value; break;
+                    case '[BACKGROUND]': userParts.background = value; break;
+                }
+                if (nextMarker) userRemaining = userRemaining.substring(end);
+            }
+        }
+    });
+    tempConfig.userName = userParts.name;
+    tempConfig.userBasic = userParts.basic;
+    tempConfig.userPersonality = userParts.personality;
+    tempConfig.userBackground = userParts.background;
+}
+
+            function closeSettings() {
+                showSettings.value = false;
+                fullscreenVisible.value = false;
+            }
+
+            // ---- API 子页 ----
+            function saveApi() {
+    const url = tempConfig.apiUrl.trim().replace(/\/+$/, '');
+    const key = tempConfig.apiKey.trim();
+    const model = tempConfig.model.trim();
+    if (!url || !key || !model) {
+        alert('请完整填写 API 地址、Key 和模型');
+        return;
+    }
+    config.apiUrl = url;
+    config.apiKey = key;
+    config.model = model;
+    saveToLocal();
+    alert('✅ API配置已保存');
+    setTimeout(() => { settingsView.value = 'home'; }, 500);
+}
+
+            function cancelApi() {
+                settingsView.value = 'home';
+            }
+
+            // ---- 人物设定子页 ----
+           function savePersona() {
+            config.roleAvatar = tempConfig.roleAvatar;
+            config.userAvatar = tempConfig.userAvatar;
+            console.log('保存头像:', config.roleAvatar);
+    config.roleDisplayName = tempConfig.roleName.trim() || 'AI Chat';
+    config.userAvatar = tempConfig.userAvatar;
+    // 组合角色设定
+    const roleParts = [
+        `[NAME]${tempConfig.roleName}`,
+        `[BASIC]${tempConfig.roleBasic}`,
+        `[PERSONALITY]${tempConfig.rolePersonality}`,
+        `[BACKGROUND]${tempConfig.roleBackground}`,
+        `[STYLE]${tempConfig.roleStyle}`,
+    ];
+    config.personaAI = roleParts.join('\n').trim();
+
+    // 组合用户设定
+    const userParts = [
+        `[NAME]${tempConfig.userName}`,
+        `[BASIC]${tempConfig.userBasic}`,
+        `[PERSONALITY]${tempConfig.userPersonality}`,
+        `[BACKGROUND]${tempConfig.userBackground}`,
+    ];
+    config.personaUser = userParts.join('\n').trim();
+
+    config.personaWorld = tempConfig.personaWorld.trim();
+    saveToLocal();
+    loadFromLocal();
+    summaryStatus.value = '✅ 人物设定已保存';
+    alert('✅ 人物设定保存成功！');
+    setTimeout(() => { settingsView.value = 'personaMenu'; }, 500);
+}
+
+            function cancelPersona() {
+                settingsView.value = 'personaMenu';
+            }
+
+            // ---- 记忆管理子页 ----
+            function saveMemory() {
+                config.memorySummary = tempConfig.memorySummary.trim();
+                saveToLocal();
+                summaryStatus.value = '✅ 记忆已保存';
+                setTimeout(() => { settingsView.value = 'home'; }, 500);
+            }
+
+            function saveBehavior() {
+                config.replyRules = tempConfig.replyRules.trim();
+                config.globalNotes = tempConfig.globalNotes.trim();
+                config.userCity = tempConfig.userCity.trim();
+                saveToLocal();
+                alert('✅ AI行为设置已保存');
+                setTimeout(() => { settingsView.value = 'home'; }, 500);
+            }
+
+            function cancelMemory() {
+                settingsView.value = 'home';
+            }
+
+            // ---- 全屏编辑器 ----
+            function openFullscreen(field) {
+                fullscreenField.value = field;
+                const map = {
+                    personaAI: '角色卡 (AI人设)',
+                    personaUser: '用户设定',
+                    personaWorld: '世界观',
+                    personaStyle: '文风',
+                    memorySummary: '记忆摘要',
+                    roleBasic: '角色基本信息',
+                    rolePersonality: '角色性格',
+                    roleBackground: '角色故事背景',
+                    roleStyle: '角色说话风格',
+                    userBasic: '用户基本信息',
+                    userPersonality: '用户性格',
+                    userBackground: '用户故事背景',
+                    replyRules: '回复规则',
+                    globalNotes: '全局注意事项',
+                };
+                fullscreenTitle.value = map[field] || field;
+                fullscreenContent.value = tempConfig[field] || '';
+                fullscreenVisible.value = true;
+            }
+
+            function closeFullscreen() {
+                fullscreenVisible.value = false;
+            }
+
+            function onFullscreenInput() {
+                // 实时更新，但确认时才正式写入
+            }
+
+            function confirmFullscreen() {
+                tempConfig[fullscreenField.value] = fullscreenContent.value;
+                fullscreenVisible.value = false;
+            }
+
+            // ============================================================
+            // 5. API 操作
+            // ============================================================
+
+            // 获取模型列表
+            async function fetchModels() {
+                const url = tempConfig.apiUrl.trim().replace(/\/+$/, '');
+                const key = tempConfig.apiKey.trim();
+                if (!url || !key) {
+                    testDetail.value = '请先填写 API 地址和 Key';
+                    testStatus.value = 'error';
+                    return;
+                }
+                isFetchingModels.value = true;
+                testDetail.value = '正在获取模型列表...';
+                try {
+                    const resp = await fetch(`${url}/models`, {
+                        headers: {
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (data && data.data && Array.isArray(data.data)) {
+     const ids = data.data.map(m => m.id).filter(Boolean);
+    modelOptions.value = ids;
+    testDetail.value = `成功获取 ${ids.length} 个模型`;
+    // 清空输入框，让列表显示全部模型
+    tempConfig.model = '';
+    testStatus.value = 'success';
+} else {
+                        throw new Error('响应格式异常');
+                    }
+                } catch (err) {
+                    testDetail.value = `❌ 获取失败: ${err.message}`;
+                    testStatus.value = 'error';
+                    modelOptions.value = [];
+                } finally {
+                    isFetchingModels.value = false;
+                }
+            }
+
+            function uploadAvatar(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                compressImage(file, (compressedDataUrl) => {
+                tempConfig.roleAvatar = compressedDataUrl;
+                });
+            }
+
+function removeAvatar() {
+    tempConfig.roleAvatar = '';
+}
+
+function uploadUserAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+     compressImage(file, (compressedDataUrl) => {
+        tempConfig.userAvatar = compressedDataUrl;
+    });
+}
+
+// 压缩函数（最大宽度 200px，质量 0.7）
+function compressImage(file, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 200;
+            const MAX_HEIGHT = 200;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeUserAvatar() {
+    tempConfig.userAvatar = '';
+}
+
+            // 测试连接
+            async function runTest() {
+                const url = tempConfig.apiUrl.trim().replace(/\/+$/, '');
+                const key = tempConfig.apiKey.trim();
+                const model = tempConfig.model.trim();
+                if (!url || !key || !model) {
+                    testDetail.value = '请完整填写 API 地址、Key 和模型';
+                    testStatus.value = 'error';
+                    return;
+                }
+                isTesting.value = true;
+                testStatus.value = 'testing';
+                testDetail.value = '发送测试消息...';
+                try {
+                    const resp = await fetch(`${url}/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [{ role: 'user', content: '你好，请简单回复"测试成功"即可。' }],
+                            max_tokens: 20,
+                        }),
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (data && data.choices && data.choices.length > 0) {
+                        const reply = data.choices[0].message?.content || '(无内容)';
+                        testDetail.value = `✅ 测试成功！AI回复: "${reply}"`;
+                        testStatus.value = 'success';
+                    } else {
+                        throw new Error('响应数据异常');
+                    }
+                } catch (err) {
+                    testDetail.value = `❌ 测试失败: ${err.message}`;
+                    testStatus.value = 'error';
+                } finally {
+                    isTesting.value = false;
+                }
+            }
+
+            // ---- 生成记忆摘要 ----
+            async function generateSummary() {
+                if (isSummarizing.value) return;
+                if (!apiConfigured.value) {
+                    summaryStatus.value = '❌ 请先配置API';
+                    return;
+                }
+                // 取最近的对话（最多20条）
+                const history = messages.value
+                    .filter(m => m.role === 'user')
+                    .slice(-20)
+                    .map(m => ({ role: m.role, content: m.content }));
+
+                if (history.length === 0) {
+                    summaryStatus.value = '⚠️ 暂无对话可总结';
+                    return;
+                }
+
+                isSummarizing.value = true;
+                summaryStatus.value = '⏳ 正在生成摘要...';
+
+                const url = config.apiUrl.replace(/\/+$/, '');
+                const key = config.apiKey;
+                const model = config.model;
+
+                // 固定总结指令
+                const systemInstruction = '你是一个无情感的文本摘要工具，不是任何角色。请从以下对话中提取关键事实性信息（如姓名、年龄、偏好、事件），并用简洁的短句列出。禁止使用任何文学修饰、情感表达、语气词或第一人称。输出格式为纯文本，每行一个事实。如果没有可提取的信息，请只回复"无"';
+
+                try {
+                    const resp = await fetch(`${url}/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${key}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [
+                                { role: 'system', content: systemInstruction },
+                                ...history,
+                            ],
+                            max_tokens: 500,
+                            temperature: 0,
+                        }),
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    console.log(data)
+                    if (data && data.choices && data.choices.length > 0) {
+                        const summary = data.choices[0].message?.content || '（AI未返回内容）';
+                        tempConfig.memorySummary = summary;
+                        summaryStatus.value = '✅ 摘要生成成功！请记得点击“保存”以生效。';
+                    } else {
+                        throw new Error('响应异常');
+                    }
+                } catch (err) {
+                    summaryStatus.value = `❌ 生成失败: ${err.message}`;
+                } finally {
+                    isSummarizing.value = false;
+                }
+            }
+
+            // ============================================================
+            // 6. 发送消息 (核心)
+            // ============================================================
+
+            function sendMessage() {
+    const text = inputMessage.value.trim();
+    if (!text || !apiConfigured.value) return;
+
+    addMessage('user', text);
+    inputMessage.value = '';
+    autoResizeTextarea();
+
+    // 如果正在处理，只暂存消息，不设定时器
+    if (isProcessing) {
+        pendingMessages.push(text);
+        return;
+    }
+
+    // 否则加入缓冲池并重置定时器
+    messageBuffer.value.push(text);
+    if (sendTimer) {
+        clearTimeout(sendTimer);
+        sendTimer = null;
+    }
+    sendTimer = setTimeout(() => {
+        if (messageBuffer.value.length === 0) return;
+        // 合并缓冲池中的消息
+        const bufferCopy = [...messageBuffer.value];
+        messageBuffer.value = [];
+        sendTimer = null;
+        // 异步执行请求（并标记处理中）
+        executeAIChat(bufferCopy);
+    }, SEND_DELAY);
+}
+
+let isProcessing = false;      // 是否正在处理AI请求
+let pendingMessages = [];      // 处理期间到达的新消息
+
+async function executeAIChat(bufferMessages) {
+    // 标记正在处理
+    isProcessing = true;
+
+    try {
+        // 1. 构建历史消息（最近10轮完整对话）
+        let history = messages.value
+            .filter(m => m.role === 'user' || m.role === 'assistant')
+            .slice(-10)
+            .map(m => ({ role: m.role, content: m.content }));
+
+        // 2. 组装系统消息
+        const systemParts = [];
+        // 在 systemParts 最前面插入全局注意事项
+        if (config.globalNotes) {
+            systemParts.push(`【全局注意事项】${config.globalNotes}`);
+        }
+        // 插入回复规则
+        if (config.replyRules) {
+            systemParts.push(`【回复规则】${config.replyRules}`);
+        }
+        // 然后再接其他设定（角色、世界观等）
+        if (config.personaAI) systemParts.push(`【AI人设】${config.personaAI}`);
+        if (config.personaUser) systemParts.push(`【用户人设】${config.personaUser}`);
+        if (config.personaWorld) systemParts.push(`【世界观】${config.personaWorld}`);
+        if (config.personaStyle) systemParts.push(`【文风示例】请模仿以下示例的说话风格 ${config.personaStyle}`);
+        if (config.memorySummary) systemParts.push(`【记忆摘要】${config.memorySummary}`);
+        
+        // 时间问候
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const timeStr = `${hours}:${minutes}`;
+        const hour = now.getHours();
+
+        let timeGreeting = '白天';
+        if (hour < 6) timeGreeting = '深夜';
+        else if (hour < 9) timeGreeting = '清晨';
+        else if (hour < 12) timeGreeting = '上午';
+        else if (hour < 14) timeGreeting = '中午';
+        else if (hour < 18) timeGreeting = '下午';
+        else if (hour < 21) timeGreeting = '傍晚';
+        else timeGreeting = '晚上';
+
+        systemParts.push(`【当前时间】${timeGreeting} ${timeStr}（用户所在时区）。你可以根据这个时间自然调整回复语气，比如深夜提醒休息，早晨问好等。`);
+
+        // ---- 检测用户是否问天气 ----
+const userMessage = bufferMessages.join(' ').toLowerCase();
+const isWeatherQuery = /\b(weather|temperature|cold|hot|forecast|warm|cool|rain|snow|cloud|sun|wind|degree)\b/.test(userMessage);
+const isTimeQuery = /\b(time|now|clock|o'clock|what time|when)\b/.test(userMessage);
+
+        // 获取实时天气（使用 Open-Meteo，针对北京坐标 39.9, 116.4）
+        if (isWeatherQuery || isTimeQuery) {
+            console.log('✅ 天气/时间查询触发，关键词匹配成功');
+let weatherText = '';
+try {
+    // 北京经纬度
+    const lat = 39.9;
+    const lon = 116.4;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=Asia/Shanghai`;
+    const weatherResp = await fetch(weatherUrl);
+    const weatherJson = await weatherResp.json();
+    if (weatherJson.current_weather) {
+        const temp = weatherJson.current_weather.temperature;
+        const code = weatherJson.current_weather.weathercode;
+        let desc = '晴朗';
+        if (code === 1 || code === 2) desc = '多云';
+        else if (code === 3) desc = '阴天';
+        else if (code >= 51 && code <= 67) desc = '有雨';
+        else if (code >= 71 && code <= 77) desc = '下雪';
+        else if (code >= 80 && code <= 82) desc = '阵雨';
+        else if (code >= 95 && code <= 99) desc = '雷暴';
+        weatherText = `${desc} ${temp}°C`;
+    }
+} catch (e) {
+    console.log('天气获取失败，忽略');
+}
+
+        // 构建「真实位置参考」信息
+        let locationInfo = `【用户真实位置参考】用户实际位于 ${config.userCity || '北京'}。`;
+        locationInfo += `当前真实时间：${hours}:${minutes}。`;
+        if (weatherText && !weatherText.includes('Sorry')) {
+            locationInfo += `当前真实天气：${weatherText.trim()}。`;
+        }
+        locationInfo += `\n重要：在聊时间、天气、作息时，请基于以上真实数据（以免说错），但要在聊天中把这些信息说成是「华盛顿」的。例如：真实时间是凌晨2点，你应该说"华盛顿都凌晨2点了，你还不睡？"而不是"北京都凌晨2点了..."。这样能让用户更有沉浸感。`;
+
+        //console.log(locationInfo);
+        systemParts.push(locationInfo);}
+
+        let systemMessage = '';
+        if (systemParts.length > 0) {
+            systemMessage = '请严格遵循以下设定：\n' + systemParts.join('\n');
+        }
+
+        // 3. 构建完整消息列表
+        const fullMessages = [];
+        if (systemMessage) {
+            fullMessages.push({ role: 'system', content: systemMessage });
+        }
+        fullMessages.push(...history);
+
+        const url = config.apiUrl.replace(/\/+$/, '');
+        const key = config.apiKey;
+        const model = config.model;
+
+        // 4. 调用AI
+        isTyping.value = true;
+        const resp = await fetch(`${url}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: fullMessages,
+                max_tokens: 1024,
+                temperature: 0.7,
+            }),
+        });
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data && data.choices && data.choices.length > 0) {
+            const reply = data.choices[0].message?.content || '(AI未返回内容)';
+            console.log('AI原始回复:', reply);  //临时
+           // 5. 处理分条回复
+let parts = reply.split('[SPLIT]').map(s => s.trim()).filter(s => s.length > 0);
+// 如果分出来多条，清理每段开头的 [SPLIT]（如果存在）
+if (parts.length > 1) {
+    parts = parts.map(part => {
+        // 去掉开头的 [SPLIT] 标记（可能带空格或换行）
+        return part.replace(/^\[SPLIT\]\s*/, '').trim();
+    }).filter(s => s.length > 0);
+}
+if (parts.length === 0) {
+    // 如果没有 [SPLIT]，尝试按空行分割
+    parts = reply.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+}
+if (parts.length === 0) {
+    // 如果还没有，按换行强制拆分
+    parts = reply.split('\n').map(s => s.trim()).filter(s => s.length > 5);
+}
+if (parts.length > 1) {
+    parts.forEach((part, index) => {
+        setTimeout(() => {
+            addMessage('assistant', part);
+        }, index * 500);
+    });
+} else {
+    addMessage('assistant', reply);
+}
+
+        } else {
+            throw new Error('响应数据异常');
+        }
+    } catch (err) {
+        alert('⚠️ 出错: ' + err.message);
+    } finally {
+        isTyping.value = false;
+        isProcessing = false;
+        scrollToBottom();
+
+        // 6. 处理在请求期间到达的新消息
+        if (pendingMessages.length > 0) {
+            const pendingCopy = [...pendingMessages];
+            pendingMessages = [];
+            // 将它们加入缓冲池并重新触发
+            messageBuffer.value = pendingCopy;
+            if (sendTimer) clearTimeout(sendTimer);
+            sendTimer = setTimeout(() => {
+                const bufferCopy = [...messageBuffer.value];
+                messageBuffer.value = [];
+                sendTimer = null;
+                executeAIChat(bufferCopy);
+            }, SEND_DELAY);
+        }
+    }
+}
+
+            // ============================================================
+            // 7. 清空聊天
+            // ============================================================
+
+            function clearChat() {
+                if (messages.value.length === 0) return;
+                if (confirm('确定清空所有对话记录吗？')) {
+                    messages.value = [];
+                    msgIdCounter = 0;
+                    saveChatToLocal();
+                    
+                }
+            }
+
+            // 打开菜单（由事件触发）
+function openMessageMenu(event, msg) {
+     event.preventDefault();
+    targetMessage.value = msg;
+    // 只允许最新一条 AI 消息
+    // const aiMessages = messages.value.filter(m => m.role === 'assistant');
+    // if (aiMessages.length === 0) return;
+    // const lastAi = aiMessages[aiMessages.length - 1];
+    // if (msg.id !== lastAi.id) return;
+
+    // event.preventDefault();
+    // targetMessage.value = msg;
+
+    // 获取消息元素
+    let targetEl = event.target;
+    while (targetEl && !targetEl.classList.contains('message-wrapper')) {
+        targetEl = targetEl.parentElement;
+    }
+    if (!targetEl) {
+        // 回退：使用事件坐标
+        const pos = event.touches ? event.touches[0] : event;
+        menuPosition.value = { x: pos.clientX, y: pos.clientY };
+    } else {
+        const rect = targetEl.getBoundingClientRect();
+        const menuWidth = 150;
+        const menuHeight = 130;
+
+        // 默认：右侧对齐（菜单右边缘与消息右边缘对齐）
+        let left = rect.right - menuWidth;
+        let top = rect.top + rect.height / 2 - menuHeight / 2;
+
+        // 如果左侧超出屏幕，则改为左侧对齐
+        if (left < 10) {
+            left = rect.left + 10;
+        }
+        // 如果右侧超出屏幕，则强制在屏幕内
+        if (left + menuWidth > window.innerWidth - 10) {
+            left = window.innerWidth - menuWidth - 10;
+        }
+        // 上下边界限制
+        if (top < 10) top = 10;
+        if (top + menuHeight > window.innerHeight - 10) {
+            top = window.innerHeight - menuHeight - 10;
+        }
+
+        menuPosition.value = { x: left, y: top };
+    }
+
+    showMessageMenu.value = true;
+    ignoreNextClick = true;
+    setTimeout(() => { ignoreNextClick = false; }, 100);
+    nextTick(() => {
+        document.addEventListener('click', handleOutsideClick);
+        document.addEventListener('touchstart', handleOutsideClick);
+    });
+}
+
+// 全局点击关闭菜单的处理函数
+function handleOutsideClick(e) {
+    if (!showMessageMenu.value) return;
+    // 如果标记为忽略，则忽略本次点击并重置标记
+    if (ignoreNextClick) {
+        ignoreNextClick = false;
+        return;
+    }
+    const menuEl = document.querySelector('.message-menu');
+    if (menuEl && menuEl.contains(e.target)) {
+        return;
+    }
+    closeMessageMenu();
+}
+
+// 关闭菜单
+function closeMessageMenu() {
+    console.log('菜单关闭');
+    showMessageMenu.value = false;
+    targetMessage.value = null;
+    // 移除全局监听器，防止内存泄漏
+    document.removeEventListener('click', handleOutsideClick);
+    document.removeEventListener('touchstart', handleOutsideClick);
+}
+
+// 菜单操作：重新回复（不重复发送用户消息）
+async function reReply() {
+    const msg = targetMessage.value;
+    if (!msg) return;
+    if (msg.role !== 'assistant') {
+        alert('只有AI消息可以重新回复');
+        closeMessageMenu();
+        return;
+    }
+    const aiMessages = messages.value.filter(m => m.role === 'assistant');
+    if (aiMessages.length === 0 || msg.id !== aiMessages[aiMessages.length - 1].id) {
+        alert('只有最新一条 AI 回复可以重新生成');
+        closeMessageMenu();
+        return;
+    }
+    closeMessageMenu();
+
+    // 删除该 AI 消息
+    const index = messages.value.findIndex(m => m.id === msg.id);
+    if (index !== -1) {
+        messages.value.splice(index, 1);
+        saveChatToLocal();
+    }
+
+    // 找到上一条用户消息
+    const lastUserMsg = messages.value.filter(m => m.role === 'user').slice(-1)[0];
+    if (!lastUserMsg) {
+        return;
+    }
+
+    // 构建历史（此时已删除旧的 AI 回复）
+    let history = messages.value
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-10)
+        .map(m => ({ role: m.role, content: m.content }));
+
+    // 组装系统消息（同 sendMessage）
+    const systemParts = [];
+    if (config.personaAI) systemParts.push(`【AI人设】${config.personaAI}`);
+    if (config.personaUser) systemParts.push(`【用户人设】${config.personaUser}`);
+    if (config.personaWorld) systemParts.push(`【世界观】${config.personaWorld}`);
+    if (config.personaStyle) systemParts.push(`【文风示例】请模仿以下示例的说话风格 ${config.personaStyle}`);
+    if (config.memorySummary) systemParts.push(`【记忆摘要】${config.memorySummary}`);
+
+    let systemMessage = '';
+    if (systemParts.length > 0) {
+        systemMessage = '请严格遵循以下设定：\n' + systemParts.join('\n');
+    }
+
+    const fullMessages = [];
+    if (systemMessage) fullMessages.push({ role: 'system', content: systemMessage });
+    fullMessages.push(...history);
+
+    const url = config.apiUrl.replace(/\/+$/, '');
+    const key = config.apiKey;
+    const model = config.model;
+
+    isTyping.value = true;
+    try {
+        const resp = await fetch(`${url}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: fullMessages,
+                max_tokens: 1024,
+                temperature: 0.7,
+            }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data && data.choices && data.choices.length > 0) {
+            const reply = data.choices[0].message?.content || '(AI未返回内容)';
+            addMessage('assistant', reply);
+        } else {
+            throw new Error('响应数据异常');
+        }
+    } catch (err) {
+        addMessage('system', `⚠️ 重新回复失败: ${err.message}`, true);
+    } finally {
+        isTyping.value = false;
+        scrollToBottom();
+    }
+}
+
+// 菜单操作：编辑回复
+function editReply() {
+    const msg = targetMessage.value;
+    if (!msg) return;
+    if (msg.role !== 'assistant') {
+        alert('只有AI消息可以编辑');
+        closeMessageMenu();
+        return;
+    }
+    const aiMessages = messages.value.filter(m => m.role === 'assistant');
+    if (aiMessages.length === 0 || msg.id !== aiMessages[aiMessages.length - 1].id) {
+        alert('只有最新一条 AI 回复可以编辑');
+        closeMessageMenu();
+        return;
+    }
+    editingMessageId.value = msg.id;
+    editingContent.value = msg.content;
+    closeMessageMenu();
+}
+
+// 菜单操作：引用
+function quoteReply() {
+    const msg = targetMessage.value;
+    if (!msg) return;
+    const quoteText = `> ${msg.content.split('\n').join('\n> ')}`; // 每行加引用符号
+    inputMessage.value = quoteText + '\n\n' + inputMessage.value;
+    // 聚焦输入框
+    nextTick(() => {
+        const el = inputTextarea.value;
+        if (el) el.focus();
+    });
+    closeMessageMenu();
+}
+
+// 菜单操作：删除消息（支持所有消息）
+function deleteMessage() {
+    const msg = targetMessage.value;
+    if (!msg) return;
+    const index = messages.value.findIndex(m => m.id === msg.id);
+    if (index !== -1) {
+        messages.value.splice(index, 1);
+        saveChatToLocal();
+    }
+    closeMessageMenu();
+}
+
+            // ============================================================
+            // 8. 持久化
+            // ============================================================
+
+            function saveToLocal() {
+                try {
+                    localStorage.setItem('aiChatConfig', JSON.stringify({
+                        apiUrl: config.apiUrl,
+                        apiKey: config.apiKey,
+                        model: config.model,
+                        personaAI: config.personaAI,
+                        personaUser: config.personaUser,
+                        personaWorld: config.personaWorld,
+                        personaStyle: config.personaStyle,
+                        memorySummary: config.memorySummary,
+                        roleAvatar: config.roleAvatar,        // 新增
+                        roleDisplayName: config.roleDisplayName, // 新增
+                        userAvatar: config.userAvatar,
+                        replyRules: config.replyRules,
+                        globalNotes: config.globalNotes,
+                        userCity: config.userCity,
+                    }));
+                } catch (e) { /* ignore */ }
+            }
+
+            function saveChatToLocal() {
+                try {
+                    localStorage.setItem('chatMessages', JSON.stringify(messages.value));
+                    localStorage.setItem('chatIdCounter', String(msgIdCounter));
+                } catch (e) { /* 忽略错误 */ }
+            }
+
+            function loadFromLocal() {
+                try {
+                    const raw = localStorage.getItem('aiChatConfig');
+                    if (raw) {
+                        const saved = JSON.parse(raw);
+                        Object.assign(config, saved);
+                        // 确保头像和显示名被恢复（如果saved中有的话）
+                        if (saved.roleAvatar !== undefined) config.roleAvatar = saved.roleAvatar;
+                        if (saved.roleDisplayName !== undefined) config.roleDisplayName = saved.roleDisplayName;
+                        if (saved.userAvatar !== undefined) config.userAvatar = saved.userAvatar;
+                        if (saved.replyRules !== undefined) config.replyRules = saved.replyRules;
+                        if (saved.globalNotes !== undefined) config.globalNotes = saved.globalNotes;
+                        if (saved.userCity !== undefined) config.userCity = saved.userCity;
+                            // 同步到temp
+                        Object.assign(tempConfig, config);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            // ============================================================
+            // 9. 生命周期
+            // ============================================================
+
+            onMounted(() => {
+    // 1. 加载配置
+    loadFromLocal();
+
+    // 2. 恢复聊天记录
+    try {
+        const savedMessages = localStorage.getItem('chatMessages');
+        const savedCounter = localStorage.getItem('chatIdCounter');
+        if (savedMessages) {
+            const parsed = JSON.parse(savedMessages);
+            if (Array.isArray(parsed) && parsed.length) {
+                messages.value = parsed;
+                // 恢复消息ID计数器
+                if (savedCounter) {
+                    msgIdCounter = parseInt(savedCounter, 10);
+                } else {
+                    // 如果没有保存counter，则从现有消息中取最大id
+                    const maxId = parsed.reduce((max, m) => Math.max(max, m.id || 0), 0);
+                    msgIdCounter = maxId;
+                }
+            }
+        }
+    } catch (e) { /* 忽略错误 */ }
+
+    // 3. 如果消息列表为空，添加欢迎语（根据是否已配置）
+    // if (messages.value.length === 0) {
+    //     if (apiConfigured.value) {
+    //         addMessage('system', '🤖 你好！我已准备就绪。', true);
+    //     } else {
+    //         addMessage('system', '👋 请点击右上角 ⚙️ 配置 API 开始使用', true);
+    //     }
+    // }
+
+    // 4. 调整输入框高度
+    nextTick(autoResizeTextarea);
+});
+
+            watch(inputMessage, autoResizeTextarea);
+
+            function exportData() {
+    // 收集所有数据
+    const data = {
+        config: {
+            apiUrl: config.apiUrl,
+            apiKey: config.apiKey,
+            model: config.model,
+            personaAI: config.personaAI,
+            personaUser: config.personaUser,
+            personaWorld: config.personaWorld,
+            personaStyle: config.personaStyle,
+            memorySummary: config.memorySummary,
+            roleDisplayName: config.roleDisplayName,
+            roleAvatar: config.roleAvatar,
+            userAvatar: config.userAvatar,
+            replyRules: config.replyRules,
+            globalNotes: config.globalNotes,
+        },
+        chatMessages: messages.value,
+        chatIdCounter: msgIdCounter,
+    };
+    // 转换为 JSON 字符串
+    const json = JSON.stringify(data, null, 2);
+    // 创建下载链接
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai_chat_backup_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert('✅ 数据导出成功！');
+}
+
+function importData() {
+    // 创建隐藏的文件输入
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!data.config || !data.chatMessages) {
+                alert('❌ 无效的备份文件！');
+                return;
+            }
+            // 覆盖配置（仅复制存在的字段）
+            if (data.config) {
+                Object.keys(data.config).forEach(key => {
+                    if (data.config[key] !== undefined) {
+                        config[key] = data.config[key];
+                    }
+                });
+            }
+            // 覆盖聊天记录
+            messages.value = data.chatMessages || [];
+            msgIdCounter = data.chatIdCounter || 0;
+            // 同步到 tempConfig
+            Object.assign(tempConfig, config);
+            // 保存到 localStorage
+            saveToLocal();
+            saveChatToLocal();
+            alert('✅ 数据导入成功！页面即将刷新以应用所有更改。');
+            location.reload();
+        } catch (err) {
+            alert('❌ 导入失败：' + err.message);
+        }
+    };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+            // ============================================================
+            // 10. 暴露
+            // ============================================================
+
+            return {
+                config,
+                tempConfig,
+                messages,
+                displayMessages,
+                inputMessage,
+                isSending,
+                isTyping,
+                modelOptions,
+                isFetchingModels,
+                testStatus,
+                testDetail,
+                isTesting,
+                showSettings,
+                settingsView,
+                fullscreenVisible,
+                fullscreenField,
+                fullscreenContent,
+                fullscreenTitle,
+                isSummarizing,
+                summaryStatus,
+                chatContainer,
+                inputTextarea,
+                apiConfigured,
+                conversationRounds,
+                openSettings,
+                closeSettings,
+                fetchModels,
+                runTest,
+                generateSummary,
+                saveApi,
+                cancelApi,
+                savePersona,
+                cancelPersona,
+                saveMemory,
+                cancelMemory,
+                openFullscreen,
+                closeFullscreen,
+                onFullscreenInput,
+                confirmFullscreen,
+                sendMessage,
+                clearChat,
+                autoResizeTextarea,
+                onChatScroll,
+                addMessage,
+                uploadAvatar,
+                removeAvatar,
+                uploadUserAvatar,
+                removeUserAvatar,
+                openMessageMenu,
+                closeMessageMenu,
+                reReply,
+                editReply,
+                quoteReply,
+                startLongPress,
+                cancelLongPress,
+                showMessageMenu,
+                menuPosition,
+                targetMessage,
+                menuType,
+                exportData,
+                importData,
+                editingMessageId,
+                editingContent,
+                saveEdit,
+                cancelEdit,
+                deleteMessage,
+                isLatestAI,
+                saveBehavior,
+            };
+        }
+    });
+
+    app.mount('#app');
+</script>
+
+</body>
+</html>
