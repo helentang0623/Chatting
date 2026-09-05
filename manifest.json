@@ -1,6 +1,6 @@
 {
   "name": "AI Chat · 智能陪伴",
-  "short_name": "AI Chat",
+  "short_name": "Chatting",
   "start_url": "/Chatting/",
   "display": "standalone",
   "background_color": "#ffffff",
