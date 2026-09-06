@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>AI Chat · 智能陪伴</title>
     
         <!-- ===== 自定义主屏幕图标 ===== -->
@@ -40,36 +40,39 @@
         }
 
         #app {
-            /*padding-top: 56px; /* 等于导航栏高度 */
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-    max-width: 480px;
-    margin: 0 auto;
-    background-color: #ffffff;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
-    position: relative;
-    overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100dvh; /* 使用动态视口高度，更好适应键盘弹出 */
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+            padding-top: 56px; /* 等于导航栏高度 */
         }
 
         /* ============================================================
                    导航栏 (与之前一致)
                    ============================================================ */
         .navbar {
-    flex-shrink: 0;              /* 保持固定高度，不被压缩 */
-    background: #075e54;
-    color: #fff;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 56px;
-    z-index: 10;
-    position: sticky;            /* 粘性定位 */
-    top: 0;                      /* 紧贴顶部 */
-    width: 100%;                 /* 父容器 #app 已经限制最大宽度 */
-    box-sizing: border-box;  
-}
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            max-width: 480px; /* 与 #app 宽度一致 */
+            margin: 0 auto;
+            background: #075e54;
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+            z-index: 10;
+            box-sizing: border-box;
+            /* 移除之前所有的 position: sticky 相关属性 */
+        }
 
         .navbar-left {
             display: flex;
@@ -409,8 +412,7 @@
             align-items: flex-end;
             gap: 8px;
             border-top: 1px solid #d1ccc7;
-            position: sticky;    /* 新增 */
-            bottom: 0;           /* 新增 */
+            /* 移除 position: sticky 和 bottom: 0 */
         }
 
         .input-area textarea {
@@ -1483,10 +1485,7 @@
                         <button class="expand-btn" @click="openFullscreen('memorySummary')">⤢</button>
                     </div>
                 </div>
-                <button class="btn-summary" @click="generateSummary" :disabled="isSummarizing || !apiConfigured">
-                    {{ isSummarizing ? '⏳ 总结中...' : '📝 立即总结当前记忆' }}
-                </button>
-                <div v-if="summaryStatus" class="test-detail" style="margin-top:10px;">{{ summaryStatus }}</div>
+                
             </div>
             <div class="settings-footer">
                 <button class="btn-cancel" @click="cancelMemory">取消</button>
@@ -1640,9 +1639,7 @@ Vue 3 应用
             const fullscreenContent = ref('');
             const fullscreenTitle = ref('');
 
-            // ---- 记忆总结 ----
-            const isSummarizing = ref(false);
-            const summaryStatus = ref('');
+           
 
             // ---- DOM refs ----
             const chatContainer = ref(null);
@@ -1800,7 +1797,7 @@ function isLatestAI(msg) {
                 // 重置测试状态
                 testStatus.value = 'idle';
                 testDetail.value = '';
-                summaryStatus.value = '';
+                
                 settingsView.value = 'home';
                 showSettings.value = true;
                 // 加载模型列表如果有
@@ -1887,7 +1884,7 @@ function parsePersonaFields() {
     config.model = model;
     saveToLocal();
     alert('✅ API配置已保存');
-    setTimeout(() => { settingsView.value = 'home'; }, 500);
+    setTimeout(() => { settingsView.value = 'home'; }, 200);
 }
 
             function cancelApi() {
@@ -1923,7 +1920,7 @@ function parsePersonaFields() {
     config.personaWorld = tempConfig.personaWorld.trim();
     saveToLocal();
     loadFromLocal();
-    summaryStatus.value = '✅ 人物设定已保存';
+    
     alert('✅ 人物设定保存成功！');
     setTimeout(() => { settingsView.value = 'personaMenu'; }, 500);
 }
@@ -1936,8 +1933,8 @@ function parsePersonaFields() {
             function saveMemory() {
                 config.memorySummary = tempConfig.memorySummary.trim();
                 saveToLocal();
-                summaryStatus.value = '✅ 记忆已保存';
-                setTimeout(() => { settingsView.value = 'home'; }, 500);
+                alert('✅ 记忆已保存');
+                setTimeout(() => { settingsView.value = 'home'; }, 200);
             }
 
             function saveBehavior() {
@@ -1946,7 +1943,7 @@ function parsePersonaFields() {
                 config.userCity = tempConfig.userCity.trim();
                 saveToLocal();
                 alert('✅ AI行为设置已保存');
-                setTimeout(() => { settingsView.value = 'home'; }, 500);
+                setTimeout(() => { settingsView.value = 'home'; }, 200);
             }
 
             function cancelMemory() {
@@ -2135,66 +2132,7 @@ function removeUserAvatar() {
             }
 
             // ---- 生成记忆摘要 ----
-            async function generateSummary() {
-                if (isSummarizing.value) return;
-                if (!apiConfigured.value) {
-                    summaryStatus.value = '❌ 请先配置API';
-                    return;
-                }
-                // 取最近的对话（最多20条）
-                const history = messages.value
-                    .filter(m => m.role === 'user')
-                    .slice(-20)
-                    .map(m => ({ role: m.role, content: m.content }));
-
-                if (history.length === 0) {
-                    summaryStatus.value = '⚠️ 暂无对话可总结';
-                    return;
-                }
-
-                isSummarizing.value = true;
-                summaryStatus.value = '⏳ 正在生成摘要...';
-
-                const url = config.apiUrl.replace(/\/+$/, '');
-                const key = config.apiKey;
-                const model = config.model;
-
-                // 固定总结指令
-                const systemInstruction = '你是一个无情感的文本摘要工具，不是任何角色。请从以下对话中提取关键事实性信息（如姓名、年龄、偏好、事件），并用简洁的短句列出。禁止使用任何文学修饰、情感表达、语气词或第一人称。输出格式为纯文本，每行一个事实。如果没有可提取的信息，请只回复"无"';
-
-                try {
-                    const resp = await fetch(`${url}/chat/completions`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${key}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            model: model,
-                            messages: [
-                                { role: 'system', content: systemInstruction },
-                                ...history,
-                            ],
-                            max_tokens: 500,
-                            temperature: 0,
-                        }),
-                    });
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                    const data = await resp.json();
-                    console.log(data)
-                    if (data && data.choices && data.choices.length > 0) {
-                        const summary = data.choices[0].message?.content || '（AI未返回内容）';
-                        tempConfig.memorySummary = summary;
-                        summaryStatus.value = '✅ 摘要生成成功！请记得点击“保存”以生效。';
-                    } else {
-                        throw new Error('响应异常');
-                    }
-                } catch (err) {
-                    summaryStatus.value = `❌ 生成失败: ${err.message}`;
-                } finally {
-                    isSummarizing.value = false;
-                }
-            }
+           
 
             // ============================================================
             // 6. 发送消息 (核心)
@@ -2734,6 +2672,17 @@ function deleteMessage() {
 
     // 4. 调整输入框高度
     nextTick(autoResizeTextarea);
+    // 4. 调整输入框高度
+nextTick(autoResizeTextarea);
+
+// ===== 新增：监听视口变化（键盘弹出时自动滚动到底部） =====
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        setTimeout(() => {
+            scrollToBottom();
+        }, 100);
+    });
+}
 });
 
             watch(inputMessage, autoResizeTextarea);
@@ -2840,8 +2789,7 @@ function importData() {
                 fullscreenField,
                 fullscreenContent,
                 fullscreenTitle,
-                isSummarizing,
-                summaryStatus,
+                
                 chatContainer,
                 inputTextarea,
                 apiConfigured,
@@ -2850,7 +2798,7 @@ function importData() {
                 closeSettings,
                 fetchModels,
                 runTest,
-                generateSummary,
+                
                 saveApi,
                 cancelApi,
                 savePersona,
