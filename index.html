@@ -81,21 +81,21 @@
         }
 
         .navbar-left .app-icon {
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             background: #25d366;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 16px;
+            font-size: 20px;
             color: #075e54;
             flex-shrink: 0;
         }
 
         .navbar-left .app-title {
-            font-size: 18px;
+            font-size: 22px;
             font-weight: 600;
             letter-spacing: 0.3px;
         }
@@ -237,15 +237,15 @@
         }
 
         .msg-avatar {
-            width: 34px;
-            height: 34px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 18px;
             color: #fff;
             background: #9b9b9b;
             margin-top: 2px;
@@ -306,7 +306,7 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
             word-break: break-word;
             line-height: 1.55;
-            font-size: 15px;
+            font-size: 17px;
             position: relative;
             min-width: 40px;
         }
@@ -1092,6 +1092,31 @@
 .message-menu .menu-item:active {
     background: #f0f0f0;
 }
+
+/* Toast 通知 */
+.toast {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.78);
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-size: 15px;
+    z-index: 999;
+    max-width: 85%;
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+    animation: toastFadeIn 0.3s ease-out;
+}
+@keyframes toastFadeIn {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
     </style>
 
     <script>
@@ -1112,10 +1137,10 @@
         <header class="navbar">
             <div class="navbar-left">
                 <span class="app-icon" style="background:transparent; width:auto; height:auto; padding:0;">
-    <img v-if="config.roleAvatar" :src="config.roleAvatar" style="width:32px; height:32px; border-radius:50%; object-fit:cover; display:block;" />
-    <span v-else style="font-size:28px; line-height:1;">🤖</span>
-</span>
-<span class="app-title">{{ config.roleDisplayName || 'AI Chat' }}</span>
+                <img v-if="config.roleAvatar" :src="config.roleAvatar" style="width:40px; height:40px; border-radius:50%; object-fit:cover; display:block;" />
+                <span v-else style="font-size:28px; line-height:1;">🤖</span>
+            </span>
+                <span class="app-title">{{ config.roleDisplayName || 'AI Chat' }}</span>
             </div>
             <div class="navbar-right">
                 <!-- <span class="status-badge" :class="apiConfigured ? 'online' : 'offline'">
@@ -1538,7 +1563,10 @@
         </div>
 
     </div>
-
+<!-- Toast 通知 -->
+<div v-if="showToast" class="toast">
+    {{ toastMessage }}
+</div>
 </div>
 
 <!-- ============================================================
@@ -1628,6 +1656,10 @@ Vue 3 应用
             const testStatus = ref('idle');
             const testDetail = ref('');
             const isTesting = ref(false);
+            
+            const toastMessage = ref('');
+            const showToast = ref(false);
+            let toastTimer = null;
 
             // ---- 设置视图 ----
             const showSettings = ref(false);
@@ -1786,6 +1818,21 @@ function isLatestAI(msg) {
     return msg.id === aiMessages[aiMessages.length - 1].id;
 }
 
+function showToastMessage(message) {
+    // 清除旧定时器
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+        toastTimer = null;
+    }
+    toastMessage.value = message;
+    showToast.value = true;
+    // 1.5 秒后自动消失
+    toastTimer = setTimeout(() => {
+        showToast.value = false;
+        toastTimer = null;
+    }, 1500);
+}
+
             // ============================================================
             // 4. 设置导航
             // ============================================================
@@ -1883,8 +1930,7 @@ function parsePersonaFields() {
     config.apiKey = key;
     config.model = model;
     saveToLocal();
-    alert('✅ API配置已保存');
-    setTimeout(() => { settingsView.value = 'home'; }, 200);
+    showToastMessage('✅ API配置已保存');
 }
 
             function cancelApi() {
@@ -1920,9 +1966,7 @@ function parsePersonaFields() {
     config.personaWorld = tempConfig.personaWorld.trim();
     saveToLocal();
     loadFromLocal();
-    
-    alert('✅ 人物设定保存成功！');
-    setTimeout(() => { settingsView.value = 'personaMenu'; }, 500);
+    showToastMessage('✅ 人物设定保存成功');
 }
 
             function cancelPersona() {
@@ -1933,8 +1977,7 @@ function parsePersonaFields() {
             function saveMemory() {
                 config.memorySummary = tempConfig.memorySummary.trim();
                 saveToLocal();
-                alert('✅ 记忆已保存');
-                setTimeout(() => { settingsView.value = 'home'; }, 200);
+                showToastMessage('✅ 记忆已保存');
             }
 
             function saveBehavior() {
@@ -1942,8 +1985,7 @@ function parsePersonaFields() {
                 config.globalNotes = tempConfig.globalNotes.trim();
                 config.userCity = tempConfig.userCity.trim();
                 saveToLocal();
-                alert('✅ AI行为设置已保存');
-                setTimeout(() => { settingsView.value = 'home'; }, 200);
+                showToastMessage('✅ AI行为设置已保存');
             }
 
             function cancelMemory() {
@@ -2838,6 +2880,9 @@ function importData() {
                 deleteMessage,
                 isLatestAI,
                 saveBehavior,
+                toastMessage,
+                showToast,
+                showToastMessage,
             };
         }
     });
