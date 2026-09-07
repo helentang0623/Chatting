@@ -1598,6 +1598,7 @@ Vue 3 应用
                 replyRules: '',
                 globalNotes: '',
                 userCity: '',
+                
             });
 
             // ---- 临时配置 (编辑用) ----
@@ -1610,6 +1611,7 @@ Vue 3 应用
                 personaWorld: '',
                 personaStyle: '',
                 memorySummary: '',
+               
                 // 角色设定拆分
                 roleName: '',
                 roleDisplayName: '',
@@ -1914,6 +1916,46 @@ function parsePersonaFields() {
     tempConfig.userBackground = userParts.background;
 }
 
+function getTimezoneFromPersona() {
+    const persona = config.personaAI || '';
+    const text = persona.toLowerCase();
+    // 常见城市到时区偏移的映射（UTC 偏移小时数）
+    const map = {
+        'london': 0,
+        'uk': 0,
+        'britain': 0,
+        'new york': -5,
+        'nyc': -5,
+        'washington': -5,
+        'dc': -5,
+        'los angeles': -8,
+        'la': -8,
+        'san francisco': -8,
+        'seattle': -8,
+        'chicago': -6,
+        'paris': 1,
+        'berlin': 1,
+        'rome': 1,
+        'madrid': 1,
+        'tokyo': 9,
+        'beijing': 8,
+        'shanghai': 8,
+        'hong kong': 8,
+        'sydney': 11,
+        'melbourne': 11,
+        'moscow': 3,
+        'dubai': 4,
+        'singapore': 8,
+    };
+    for (const [key, offset] of Object.entries(map)) {
+        if (text.includes(key)) {
+            return offset;
+        }
+    }
+    // 如果没匹配到，默认 0（UTC）
+    return 0;
+}
+
             function closeSettings() {
                 showSettings.value = false;
                 fullscreenVisible.value = false;
@@ -1925,7 +1967,7 @@ function parsePersonaFields() {
     const key = tempConfig.apiKey.trim();
     const model = tempConfig.model.trim();
     if (!url || !key || !model) {
-        alert('请完整填写 API 地址、Key 和模型');
+        showToastMessage('请完整填写 API 地址、Key 和模型');
         return;
     }
     config.apiUrl = url;
@@ -1986,6 +2028,7 @@ function parsePersonaFields() {
                 config.replyRules = tempConfig.replyRules.trim();
                 config.globalNotes = tempConfig.globalNotes.trim();
                 config.userCity = tempConfig.userCity.trim();
+                
                 saveToLocal();
                 showToastMessage('✅ 行为设置已保存');
             }
@@ -2236,9 +2279,24 @@ function triggerActiveMessage() {
         timeSinceLast = Date.now() - lastMsg.timestamp;
     }
     const minutesSinceLast = timeSinceLast / (60 * 1000);
+    console.log(`minutesSinceLast: ${minutesSinceLast}`);
 
+    
     // 构建系统消息
     const systemParts = [];
+
+    // 主动指令放在最前面
+let activeInstruction = `你是主动发起对话的一方。`;
+if (minutesSinceLast > 5) {
+    activeInstruction += `上一个话题已结束。你必须开启一个全新的话题，可以从问候、分享你最近的事情、或者提出一个轻松的问题开始。不要延续旧话题。`;
+} else {
+    activeInstruction += ` 请根据当前的对话氛围，主动说一句话。如果当前话题还在进行中，就继续这个话题；如果当前话题已经自然结束，就开启一个新话题或分享一个想法。`;
+}
+    systemParts.push(`【主动指令】${activeInstruction}`);
+    systemParts.push(`【新话题标记】之前的对话已经自然结束。你现在要开启一个全新的、独立的话题。不要参考或延续之前任何消息的内容。`);
+    systemParts.push(`【格式要求】你的回复必须只包含纯文字对话，严禁使用任何动作、表情、场景描写。不要用括号、星号或任何符号。直接说你想说的话。`);
+    systemParts.push(`【角色身份】你是 ${config.roleDisplayName || 'AI'}，你是对话的另一方，不是用户。你正在主动发起一条新消息。你的发言必须从你的角度出发，用第一人称“我”。不要扮演用户，不要替用户回复。`);
+    systemParts.push(`【时区说明】用户真实所在地是北京（UTC+8），但用户角色设定在华盛顿（UTC-5）。你的角色（AI）的当地时间比华盛顿早5小时（即伦敦，UTC+0）。请根据当前真实时间（已在上面给出）推算你的当地时间，并在涉及时间、作息时使用你的当地时间。`);
     if (config.globalNotes) systemParts.push(`【全局注意事项】${config.globalNotes}`);
     if (config.replyRules) systemParts.push(`【回复规则】${config.replyRules}`);
     if (config.personaAI) systemParts.push(`【AI人设】${config.personaAI}`);
@@ -2247,13 +2305,7 @@ function triggerActiveMessage() {
     if (config.personaStyle) systemParts.push(`【文风示例】请模仿以下示例的说话风格 ${config.personaStyle}`);
     if (config.memorySummary) systemParts.push(`【记忆摘要】${config.memorySummary}`);
 
-    let activeInstruction = `你是主动发起对话的一方。`;
-    if (minutesSinceLast > 5) {
-        activeInstruction += `你和用户已经 ${Math.round(minutesSinceLast)} 分钟没有交流了。这通常意味着上一个话题已经结束。请主动开启一个全新的话题，可以是关心用户近况、分享一个想法、提出一个问题，或者引入一个新话题。如果上一个话题明确没有结束，可继续上一个话题。`;
-    } else {
-        activeInstruction += ` 请根据当前的对话氛围，主动说一句话。如果当前话题还在进行中，就继续这个话题；如果当前话题已经自然结束，就开启一个新话题或分享一个想法。`;
-    }
-    systemParts.push(`【主动指令】${activeInstruction}`);
+   
 
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -2269,12 +2321,17 @@ function triggerActiveMessage() {
     else timeGreeting = '晚上';
     systemParts.push(`【当前时间】${timeGreeting} ${hours}:${minutes}。你可以根据时间适当问候。`);
 
+    
+
     let systemMessage = '请严格遵循以下设定：\n' + systemParts.join('\n');
 
-    let history = messages.value
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .slice(-10)
-        .map(m => ({ role: m.role, content: m.content }));
+    // 主动消息时，不使用历史消息，让 AI 完全基于当前角色设定和指令发起新话题
+    let history = [];
+
+    // let history = messages.value
+    //     .filter(m => m.role === 'user' || m.role === 'assistant')
+    //     .slice(-10)
+    //     .map(m => ({ role: m.role, content: m.content }));
 
     const fullMessages = [];
     fullMessages.push({ role: 'system', content: systemMessage });
@@ -2296,8 +2353,8 @@ function triggerActiveMessage() {
         body: JSON.stringify({
             model: model,
             messages: fullMessages,
-            max_tokens: 1024,
-            temperature: 0.7,
+            max_tokens: 1500,
+            temperature: 0.5,
         }),
     })
     .then(resp => {
@@ -2331,7 +2388,7 @@ function triggerActiveMessage() {
         }
     })
     .catch(err => {
-        alert('⚠️ 主动消息发送失败: ' + err.message);
+        showToastMessage('⚠️ 主动消息发送失败: ' + err.message);
     })
     .finally(() => {
         isSending.value = false;
@@ -2388,6 +2445,8 @@ async function executeAIChat(bufferMessages) {
         else timeGreeting = '晚上';
 
         systemParts.push(`【当前时间】${timeGreeting} ${timeStr}（用户所在时区）。你可以根据这个时间自然调整回复语气，比如深夜提醒休息，早晨问好等。`);
+
+       
 
         // ---- 检测用户是否问天气 ----
 const userMessage = bufferMessages.join(' ').toLowerCase();
@@ -2459,8 +2518,8 @@ try {
             body: JSON.stringify({
                 model: model,
                 messages: fullMessages,
-                max_tokens: 1024,
-                temperature: 0.7,
+                max_tokens: 1500,
+                temperature: 0.5,
             }),
         });
 
@@ -2500,7 +2559,7 @@ if (parts.length > 1) {
             throw new Error('响应数据异常');
         }
     } catch (err) {
-        alert('⚠️ 出错: ' + err.message);
+        showToastMessage('⚠️ 出错: ' + err.message);
     } finally {
         isTyping.value = false;
         isProcessing = false;
@@ -2688,7 +2747,7 @@ async function reReply() {
                 model: model,
                 messages: fullMessages,
                 max_tokens: 1024,
-                temperature: 0.7,
+                temperature: 0.5,
             }),
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2700,7 +2759,7 @@ async function reReply() {
             throw new Error('响应数据异常');
         }
     } catch (err) {
-        addMessage('system', `⚠️ 重新回复失败: ${err.message}`, true);
+        showToastMessage('⚠️ 重新回复失败: ' + err.message);
     } finally {
         isTyping.value = false;
         scrollToBottom();
@@ -2774,6 +2833,7 @@ function deleteMessage() {
                         replyRules: config.replyRules,
                         globalNotes: config.globalNotes,
                         userCity: config.userCity,
+                        
                     }));
                 } catch (e) { /* ignore */ }
             }
@@ -2798,6 +2858,7 @@ function deleteMessage() {
                         if (saved.replyRules !== undefined) config.replyRules = saved.replyRules;
                         if (saved.globalNotes !== undefined) config.globalNotes = saved.globalNotes;
                         if (saved.userCity !== undefined) config.userCity = saved.userCity;
+                        
                             // 同步到temp
                         Object.assign(tempConfig, config);
                     }
@@ -2901,7 +2962,7 @@ if (window.visualViewport) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    alert('✅ 数据导出成功！');
+    showToastMessage('✅ 数据导出成功！');
 }
 
 function importData() {
