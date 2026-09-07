@@ -1020,9 +1020,9 @@
                 font-size: 20px;
             }
             .msg-avatar {
-                width: 32px;
-                height: 32px;
-                ont-size: 14px;
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
             }
         }
 
@@ -1233,9 +1233,9 @@
 
         <!-- ===== 底部输入栏 ===== -->
         <div class="input-area">
-            <textarea v-model="inputMessage" @keydown.enter.prevent="sendMessage" @input="autoResizeTextarea"
+            <textarea v-model="inputMessage" @input="autoResizeTextarea"
             placeholder="输入消息..." rows="1" ref="inputTextarea" :disabled="isSending || !apiConfigured">
-        </textarea>
+            </textarea>
         <button class="btn-send" @click="sendMessage" :disabled="isSending || !inputMessage.trim() || !apiConfigured">
             <span v-if="!isSending">➤</span>
             <span v-else style="font-size:16px;">⏳</span>
@@ -2211,6 +2211,13 @@ function removeUserAvatar() {
         // 异步执行请求（并标记处理中）
         executeAIChat(bufferCopy);
     }, SEND_DELAY);
+
+    // 保持键盘开启（重新聚焦输入框）
+    setTimeout(() => {
+        if (inputTextarea.value) {
+            inputTextarea.value.focus();
+        }
+    }, 50);
 }
 
 let isProcessing = false;      // 是否正在处理AI请求
@@ -2715,9 +2722,19 @@ function deleteMessage() {
     // }
 
     // 4. 调整输入框高度
-    nextTick(autoResizeTextarea);
-    // 4. 调整输入框高度
 nextTick(autoResizeTextarea);
+
+// 加载后立即定位到底部，无动画
+nextTick(() => {
+    const el = chatContainer.value;
+    if (el) {
+        // 临时禁用平滑滚动
+        el.style.scrollBehavior = 'auto';
+        el.scrollTop = el.scrollHeight;
+        // （可选）恢复平滑滚动，但保持 auto 也可以
+        // el.style.scrollBehavior = 'smooth';
+    }
+});
 
 // ===== 新增：监听视口变化（键盘弹出时自动滚动到底部） =====
 if (window.visualViewport) {
