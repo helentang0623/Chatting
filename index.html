@@ -1236,7 +1236,7 @@
             <textarea v-model="inputMessage" @input="autoResizeTextarea"
             placeholder="输入消息..." rows="1" ref="inputTextarea" :disabled="isSending || !apiConfigured">
             </textarea>
-        <button class="btn-send" @click="sendMessage" :disabled="isSending || !inputMessage.trim() || !apiConfigured">
+        <button class="btn-send" @click="sendMessage" :disabled="isSending || !apiConfigured">
             <span v-if="!isSending">➤</span>
             <span v-else style="font-size:16px;">⏳</span>
         </button>
@@ -1269,7 +1269,7 @@
                 <span class="item-arrow">›</span>
             </div>
             <div class="settings-list-item" @click="settingsView = 'behavior'">
-                <span class="item-label">🤖 AI行为设置</span>
+                <span class="item-label">🤖 行为设置</span>
                 <span class="item-arrow">›</span>
             </div>
             <div class="settings-list-item" @click="clearChat">
@@ -1350,7 +1350,7 @@
     <div class="settings-body">
         <div class="settings-list">
             <div class="settings-list-item" @click="settingsView = 'personaRole'">
-                <span class="item-label">🎭 角色设定 (AI)</span>
+                <span class="item-label">🎭 角色设定 </span>
                 <span class="item-arrow">›</span>
             </div>
             <div class="settings-list-item" @click="settingsView = 'personaUser'">
@@ -1369,7 +1369,7 @@
 <template v-if="settingsView === 'personaRole'">
     <div class="settings-header">
         <button class="back-btn" @click="settingsView = 'personaMenu'">‹</button>
-        <h2>角色设定 (AI)</h2>
+        <h2>角色设定 </h2>
         <span style="width:40px;"></span>
     </div>
     <div class="settings-body">
@@ -1523,7 +1523,7 @@
 <template v-if="settingsView === 'behavior'">
     <div class="settings-header">
         <button class="back-btn" @click="settingsView = 'home'">‹</button>
-        <h2>AI行为设置</h2>
+        <h2>行为设置</h2>
         <span style="width:40px;"></span>
     </div>
     <div class="settings-body">
@@ -1987,7 +1987,7 @@ function parsePersonaFields() {
                 config.globalNotes = tempConfig.globalNotes.trim();
                 config.userCity = tempConfig.userCity.trim();
                 saveToLocal();
-                showToastMessage('✅ AI行为设置已保存');
+                showToastMessage('✅ 行为设置已保存');
             }
 
             function cancelMemory() {
@@ -2184,40 +2184,160 @@ function removeUserAvatar() {
 
             function sendMessage() {
     const text = inputMessage.value.trim();
-    if (!text || !apiConfigured.value) return;
 
-    addMessage('user', text);
-    inputMessage.value = '';
-    autoResizeTextarea();
+    // 如果输入框有内容，走正常的用户发送流程
+    if (text) {
+        addMessage('user', text);
+        inputMessage.value = '';
+        autoResizeTextarea();
 
-    // 如果正在处理，只暂存消息，不设定时器
-    if (isProcessing) {
-        pendingMessages.push(text);
+        // 正常连发逻辑（原有）
+        if (isProcessing) {
+            pendingMessages.push(text);
+            return;
+        }
+        messageBuffer.value.push(text);
+        if (sendTimer) {
+            clearTimeout(sendTimer);
+            sendTimer = null;
+        }
+        sendTimer = setTimeout(() => {
+            if (messageBuffer.value.length === 0) return;
+            const bufferCopy = [...messageBuffer.value];
+            messageBuffer.value = [];
+            sendTimer = null;
+            executeAIChat(bufferCopy);
+        }, SEND_DELAY);
+
+        // 保持键盘开启（你之前加的）
+        setTimeout(() => {
+            if (inputTextarea.value) {
+                inputTextarea.value.focus();
+            }
+        }, 50);
         return;
     }
 
-    // 否则加入缓冲池并重置定时器
-    messageBuffer.value.push(text);
-    if (sendTimer) {
-        clearTimeout(sendTimer);
-        sendTimer = null;
-    }
-    sendTimer = setTimeout(() => {
-        if (messageBuffer.value.length === 0) return;
-        // 合并缓冲池中的消息
-        const bufferCopy = [...messageBuffer.value];
-        messageBuffer.value = [];
-        sendTimer = null;
-        // 异步执行请求（并标记处理中）
-        executeAIChat(bufferCopy);
-    }, SEND_DELAY);
+    // 如果输入为空 → 主动发消息
+    triggerActiveMessage();
+}
 
-    // 保持键盘开启（重新聚焦输入框）
-    setTimeout(() => {
-        if (inputTextarea.value) {
-            inputTextarea.value.focus();
+function triggerActiveMessage() {
+    if (!apiConfigured.value) {
+        showToastMessage('⚠️ 请先配置 API');
+        return;
+    }
+    if (isProcessing || isSending.value) return;
+
+    // 判断距离上一条消息的时间间隔
+    const lastMsg = messages.value.length > 0 ? messages.value[messages.value.length - 1] : null;
+    let timeSinceLast = Infinity;
+    if (lastMsg && lastMsg.timestamp) {
+        timeSinceLast = Date.now() - lastMsg.timestamp;
+    }
+    const minutesSinceLast = timeSinceLast / (60 * 1000);
+
+    // 构建系统消息
+    const systemParts = [];
+    if (config.globalNotes) systemParts.push(`【全局注意事项】${config.globalNotes}`);
+    if (config.replyRules) systemParts.push(`【回复规则】${config.replyRules}`);
+    if (config.personaAI) systemParts.push(`【AI人设】${config.personaAI}`);
+    if (config.personaUser) systemParts.push(`【用户人设】${config.personaUser}`);
+    if (config.personaWorld) systemParts.push(`【世界观】${config.personaWorld}`);
+    if (config.personaStyle) systemParts.push(`【文风示例】请模仿以下示例的说话风格 ${config.personaStyle}`);
+    if (config.memorySummary) systemParts.push(`【记忆摘要】${config.memorySummary}`);
+
+    let activeInstruction = `你是主动发起对话的一方。`;
+    if (minutesSinceLast > 5) {
+        activeInstruction += `你和用户已经 ${Math.round(minutesSinceLast)} 分钟没有交流了。这通常意味着上一个话题已经结束。请主动开启一个全新的话题，可以是关心用户近况、分享一个想法、提出一个问题，或者引入一个新话题。如果上一个话题明确没有结束，可继续上一个话题。`;
+    } else {
+        activeInstruction += ` 请根据当前的对话氛围，主动说一句话。如果当前话题还在进行中，就继续这个话题；如果当前话题已经自然结束，就开启一个新话题或分享一个想法。`;
+    }
+    systemParts.push(`【主动指令】${activeInstruction}`);
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const hour = now.getHours();
+    let timeGreeting = '白天';
+    if (hour < 6) timeGreeting = '深夜';
+    else if (hour < 9) timeGreeting = '清晨';
+    else if (hour < 12) timeGreeting = '上午';
+    else if (hour < 14) timeGreeting = '中午';
+    else if (hour < 18) timeGreeting = '下午';
+    else if (hour < 21) timeGreeting = '傍晚';
+    else timeGreeting = '晚上';
+    systemParts.push(`【当前时间】${timeGreeting} ${hours}:${minutes}。你可以根据时间适当问候。`);
+
+    let systemMessage = '请严格遵循以下设定：\n' + systemParts.join('\n');
+
+    let history = messages.value
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-10)
+        .map(m => ({ role: m.role, content: m.content }));
+
+    const fullMessages = [];
+    fullMessages.push({ role: 'system', content: systemMessage });
+    fullMessages.push(...history);
+
+    isSending.value = true;
+    isTyping.value = true;
+
+    const url = config.apiUrl.replace(/\/+$/, '');
+    const key = config.apiKey;
+    const model = config.model;
+
+    fetch(`${url}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: model,
+            messages: fullMessages,
+            max_tokens: 1024,
+            temperature: 0.7,
+        }),
+    })
+    .then(resp => {
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.json();
+    })
+    .then(data => {
+        if (data && data.choices && data.choices.length > 0) {
+            const reply = data.choices[0].message?.content || '(AI未返回内容)';
+            let parts = reply.split('[SPLIT]').map(s => s.trim()).filter(s => s.length > 0);
+            if (parts.length > 1) {
+                parts = parts.map(part => part.replace(/^\[SPLIT\]\s*/, '').trim()).filter(s => s.length > 0);
+            }
+            if (parts.length === 0) {
+                parts = reply.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+            }
+            if (parts.length === 0) {
+                parts = reply.split('\n').map(s => s.trim()).filter(s => s.length > 5);
+            }
+            if (parts.length > 1) {
+                parts.forEach((part, index) => {
+                    setTimeout(() => {
+                        addMessage('assistant', part);
+                    }, index * 500);
+                });
+            } else {
+                addMessage('assistant', reply);
+            }
+        } else {
+            throw new Error('响应数据异常');
         }
-    }, 50);
+    })
+    .catch(err => {
+        alert('⚠️ 主动消息发送失败: ' + err.message);
+    })
+    .finally(() => {
+        isSending.value = false;
+        isTyping.value = false;
+        scrollToBottom();
+    });
 }
 
 let isProcessing = false;      // 是否正在处理AI请求
